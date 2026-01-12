@@ -18,11 +18,11 @@ export function useFinanceData() {
       
       if (error) throw error;
       
-      // Map clients data
+      // Map clients data with null checks
       return (data || []).map(item => ({
         id: item.id,
-        name: item.name,
-        createdAt: new Date(item.created_at),
+        name: item.name || '',
+        createdAt: item.created_at ? new Date(item.created_at) : new Date(),
       })) as Client[];
     },
     enabled: !!user,
@@ -40,15 +40,15 @@ export function useFinanceData() {
       
       if (error) throw error;
       
-      // Map incomes data
+      // Map incomes data with null checks
       return (data || []).map(item => ({
         id: item.id,
-        description: item.description,
-        amount: item.amount,
-        clientId: item.client_id,
-        paymentDate: new Date(item.payment_date),
-        category: item.category,
-        createdAt: new Date(item.created_at),
+        description: item.description || '',
+        amount: item.amount || 0,
+        clientId: item.client_id || '',
+        paymentDate: item.payment_date ? new Date(item.payment_date) : new Date(),
+        category: item.category || '',
+        createdAt: item.created_at ? new Date(item.created_at) : new Date(),
       })) as Income[];
     },
     enabled: !!user,
@@ -66,18 +66,18 @@ export function useFinanceData() {
       
       if (error) throw error;
       
-      // Map expenses data
+      // Map expenses data with null checks
       return (data || []).map(item => ({
         id: item.id,
-        description: item.description,
-        amount: item.amount,
-        category: item.category,
-        dueDate: new Date(item.due_date),
-        status: item.status,
-        paymentSourceId: item.payment_source_id,
-        type: item.type,
-        isFixed: item.is_fixed,
-        createdAt: new Date(item.created_at),
+        description: item.description || '',
+        amount: item.amount || 0,
+        category: item.category || '',
+        dueDate: item.due_date ? new Date(item.due_date) : new Date(),
+        status: item.status || 'unpaid',
+        paymentSourceId: item.payment_source_id || undefined,
+        type: item.type || 'business',
+        isFixed: item.is_fixed || false,
+        createdAt: item.created_at ? new Date(item.created_at) : new Date(),
       })) as Expense[];
     },
     enabled: !!user,
@@ -91,19 +91,19 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('investments')
         .select('*')
-        .eq('user_id', user.id) // <-- Filtrar por user_id
+        .eq('user_id', user.id)
         .order('date', { ascending: false });
       
       if (error) throw error;
       
-      // Map investments data
+      // Map investments data with null checks
       return (data || []).map(item => ({
         id: item.id,
-        description: item.description,
-        amount: item.amount,
-        category: item.category,
-        date: new Date(item.date),
-        createdAt: new Date(item.created_at),
+        description: item.description || '',
+        amount: item.amount || 0,
+        category: item.category || '',
+        date: item.date ? new Date(item.date) : new Date(),
+        createdAt: item.created_at ? new Date(item.created_at) : new Date(),
       })) as Investment[];
     },
     enabled: !!user,
@@ -117,7 +117,6 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
-      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_financial_summary', {
           target_month: currentMonth,
@@ -125,7 +124,7 @@ export function useFinanceData() {
         });
       
       if (error) throw error;
-      return data[0] || null;
+      return data && data[0] ? data[0] : null;
     },
     enabled: !!user,
   });
@@ -135,7 +134,6 @@ export function useFinanceData() {
     queryFn: async () => {
       if (!user) return [];
       
-      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_evolution_data', {
           months_back: 12,
@@ -155,7 +153,6 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
-      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_expense_categories', {
           target_month: currentMonth,
@@ -176,7 +173,6 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
-      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_client_expense_allocation', {
           target_month: currentMonth,
@@ -194,12 +190,11 @@ export function useFinanceData() {
     queryFn: async () => {
       if (!user) return null;
       
-      // RPC call updated: no parameters needed, function uses auth.uid() internally
       const { data, error } = await supabase
         .rpc('check_mei_limits');
       
       if (error) throw error;
-      return data[0] || null;
+      return data && data[0] ? data[0] : null;
     },
     enabled: !!user,
   });
