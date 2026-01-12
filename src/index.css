@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Background & Surfaces */
+    --background: 220 20% 97%;
+    --foreground: 220 30% 15%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 15%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 15%;
+    
+    /* Primary - Deep Teal */
+    --primary: 200 80% 35%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary - Soft Gray Blue */
+    --secondary: 215 25% 92%;
+    --secondary-foreground: 220 30% 25%;
+    
+    /* Muted */
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 15% 45%;
+    
+    /* Accent */
+    --accent: 200 70% 95%;
+    --accent-foreground: 200 80% 30%;
+    
+    /* Semantic Colors */
+    --success: 150 70% 40%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 150 60% 95%;
+    
+    --warning: 38 95% 50%;
+    --warning-foreground: 38 95% 15%;
+    --warning-light: 38 90% 95%;
+    
+    --danger: 0 75% 55%;
+    --danger-foreground: 0 0% 100%;
+    --danger-light: 0 70% 96%;
+    
+    --info: 210 80% 55%;
+    --info-foreground: 0 0% 100%;
+    --info-light: 210 80% 96%;
+    
+    /* Finance specific */
+    --income: 150 70% 40%;
+    --income-light: 150 60% 95%;
+    --expense: 0 75% 55%;
+    --expense-light: 0 70% 96%;
+    --investment: 260 70% 55%;
+    --investment-light: 260 60% 96%;
+    --saved: 38 95% 50%;
+    --saved-light: 38 90% 95%;
+    
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 200 80% 35%;
+    
+    --radius: 0.75rem;
+    
+    /* Sidebar */
+    --sidebar-background: 220 30% 15%;
+    --sidebar-foreground: 220 15% 85%;
+    --sidebar-primary: 200 80% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 25% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 25% 25%;
+    --sidebar-ring: 200 80% 55%;
+    --sidebar-muted: 220 20% 40%;
+  }
+
+  .dark {
+    --background: 220 30% 8%;
+    --foreground: 220 15% 95%;
+    
+    --card: 220 25% 12%;
+    --card-foreground: 220 15% 95%;
+    
+    --popover: 220 25% 12%;
+    --popover-foreground: 220 15% 95%;
+    
+    --primary: 200 75% 50%;
+    --primary-foreground: 220 30% 10%;
+    
+    --secondary: 220 25% 18%;
+    --secondary-foreground: 220 15% 85%;
+    
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 15% 60%;
+    
+    --accent: 200 60% 20%;
+    --accent-foreground: 200 75% 70%;
+    
+    --success: 150 65% 45%;
+    --success-light: 150 40% 15%;
+    
+    --warning: 38 90% 55%;
+    --warning-light: 38 60% 15%;
+    
+    --danger: 0 70% 50%;
+    --danger-light: 0 50% 15%;
+    
+    --info: 210 75% 55%;
+    --info-light: 210 50% 15%;
+    
+    --income: 150 65% 45%;
+    --income-light: 150 40% 15%;
+    --expense: 0 70% 50%;
+    --expense-light: 0 50% 15%;
+    --investment: 260 65% 60%;
+    --investment-light: 260 40% 18%;
+    --saved: 38 90% 55%;
+    --saved-light: 38 60% 15%;
+    
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 20% 22%;
+    --input: 220 20% 22%;
+    --ring: 200 75% 50%;
+    
+    --sidebar-background: 220 35% 6%;
+    --sidebar-foreground: 220 15% 85%;
+    --sidebar-primary: 200 75% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 30% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 25% 18%;
+    --sidebar-ring: 200 75% 50%;
+    --sidebar-muted: 220 15% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+@layer components {
+  .stat-card {
+    @apply bg-card rounded-xl p-3 sm:p-5 shadow-sm border border-border/50 transition-all duration-200 hover:shadow-md;
+  }
+  
+  .stat-card-income {
+    @apply stat-card border-l-4 border-l-income;
+  }
+  
+  .stat-card-expense {
+    @apply stat-card border-l-4 border-l-expense;
+  }
+  
+  .stat-card-investment {
+    @apply stat-card border-l-4 border-l-investment;
+  }
+  
+  .stat-card-saved {
+    @apply stat-card border-l-4 border-l-saved;
+  }
+  
+  .stat-card-balance {
+    @apply stat-card border-l-4 border-l-primary;
+  }
+  
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-paid {
+    @apply status-badge bg-success-light text-success;
+  }
+  
+  .status-unpaid {
+    @apply status-badge bg-danger-light text-danger;
+  }
+  
+  .status-saved {
+    @apply status-badge bg-saved-light text-saved;
+  }
+  
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm rounded-xl border border-border/50 shadow-lg;
+  }
+}
+
+@layer utilities {
+  .text-income {
+    color: hsl(var(--income));
+  }
+  
+  .text-expense {
+    color: hsl(var(--expense));
+  }
+  
+  .text-investment {
+    color: hsl(var(--investment));
+  }
+  
+  .text-saved {
+    color: hsl(var(--saved));
+  }
+  
+  .bg-income {
+    background-color: hsl(var(--income));
+  }
+  
+  .bg-income-light {
+    background-color: hsl(var(--income-light));
+  }
+  
+  .bg-expense {
+    background-color: hsl(var(--expense));
+  }
+  
+  .bg-expense-light {
+    background-color: hsl(var(--expense-light));
+  }
+  
+  .bg-investment {
+    background-color: hsl(var(--investment));
+  }
+  
+  .bg-investment-light {
+    background-color: hsl(var(--investment-light));
+  }
+  
+  .bg-saved {
+    background-color: hsl(var(--saved));
+  }
+  
+  .bg-saved-light {
+    background-color: hsl(var(--saved-light));
+  }
+  
+  .border-income {
+    border-color: hsl(var(--income));
+  }
+  
+  .border-expense {
+    border-color: hsl(var(--expense));
+  }
+  
+  .border-investment {
+    border-color: hsl(var(--investment));
+  }
+  
+  .border-saved {
+    border-color: hsl(var(--saved));
+  }
+}
