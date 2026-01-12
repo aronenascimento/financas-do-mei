@@ -32,32 +32,32 @@ function AppContent() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <main className="flex-1 lg:ml-64 p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8 transition-all duration-300">
-          <div className="max-w-7xl mx-auto">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/empresa" element={<BusinessPage />} />
-              <Route path="/pessoal" element={<PersonalPage />} />
-              <Route path="/clientes" element={<ClientsPage />} />
-              <Route path="/recebimentos" element={<IncomePage />} />
-              <Route path="/investimentos" element={<InvestmentsPage />} />
-              <Route path="/dre" element={<DREPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-        </main>
-      </div>
-    </BrowserRouter>
+    <div className="min-h-screen flex w-full">
+      <AppSidebar />
+      <main className="flex-1 lg:ml-64 p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8 transition-all duration-300">
+        <div className="max-w-7xl mx-auto">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/empresa" element={<BusinessPage />} />
+            <Route path="/pessoal" element={<PersonalPage />} />
+            <Route path="/clientes" element={<ClientsPage />} />
+            <Route path="/recebimentos" element={<IncomePage />} />
+            <Route path="/investimentos" element={<InvestmentsPage />} />
+            <Route path="/dre" element={<DREPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
+      </main>
+    </div>
   );
 }
 
 function App() {
   return (
     <AppProviders>
-      <AppContent />
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
     </AppProviders>
   );
 }
