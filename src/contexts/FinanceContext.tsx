@@ -6,23 +6,14 @@ import {
   Expense, 
   Investment, 
   FinancialSummary, 
-  PaymentStatus 
+  PaymentStatus,
+  MEILimitData // Import MEILimitData from types
 } from '@/types/finance';
 import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
-interface MEILimitData {
-  year: number;
-  accumulated_income: number;
-  percentage: number;
-  zone: 'safe' | 'attention' | 'urgent' | 'exceeded' | 'critical';
-  status: string;
-  projection: number;
-  projection_percentage: number;
-  problematic_categories: string[];
-}
 
 interface FinanceContextType {
   clients: Client[];

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { Income, Expense, Investment, Client } from '@/types/finance';
 
 export function useFinanceData() {
   const { user } = useAuth();
@@ -13,10 +14,16 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .eq('user_id', user.id); // <-- Filtrar por user_id
+        .eq('user_id', user.id);
       
       if (error) throw error;
-      return data || [];
+      
+      // Map clients data
+      return (data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        createdAt: new Date(item.created_at),
+      })) as Client[];
     },
     enabled: !!user,
   });
@@ -29,11 +36,20 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('incomes')
         .select('*')
-        // RLS agora filtra por client_id pertencente ao user.id, então não precisamos de filtro aqui.
         .order('payment_date', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // Map incomes data
+      return (data || []).map(item => ({
+        id: item.id,
+        description: item.description,
+        amount: item.amount,
+        clientId: item.client_id,
+        paymentDate: new Date(item.payment_date),
+        category: item.category,
+        createdAt: new Date(item.created_at),
+      })) as Income[];
     },
     enabled: !!user,
   });
@@ -46,11 +62,23 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('expenses')
         .select('*')
-        // RLS agora filtra por payment_source_id pertencente ao user.id's clients OU NULL.
         .order('due_date', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // Map expenses data
+      return (data || []).map(item => ({
+        id: item.id,
+        description: item.description,
+        amount: item.amount,
+        category: item.category,
+        dueDate: new Date(item.due_date),
+        status: item.status,
+        paymentSourceId: item.payment_source_id,
+        type: item.type,
+        isFixed: item.is_fixed,
+        createdAt: new Date(item.created_at),
+      })) as Expense[];
     },
     enabled: !!user,
   });
@@ -67,7 +95,16 @@ export function useFinanceData() {
         .order('date', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // Map investments data
+      return (data || []).map(item => ({
+        id: item.id,
+        description: item.description,
+        amount: item.amount,
+        category: item.category,
+        date: new Date(item.date),
+        createdAt: new Date(item.created_at),
+      })) as Investment[];
     },
     enabled: !!user,
   });

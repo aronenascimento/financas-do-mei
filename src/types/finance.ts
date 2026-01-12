@@ -52,3 +52,14 @@ export interface FinancialSummary {
   personalPaidExpenses: number; // Despesas pessoais pagas
   expensesBySource: Record<string, number>;
 }
+
+export interface MEILimitData {
+  year: number;
+  accumulated_income: number;
+  percentage: number;
+  zone: 'safe' | 'attention' | 'urgent' | 'exceeded' | 'critical';
+  status: string;
+  projection: number;
+  projection_percentage: number;
+  problematic_categories: string[];
+}
