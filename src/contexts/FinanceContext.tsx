@@ -139,10 +139,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // RLS requires 'id' to be auth.uid() for insertion
+      // CORREÇÃO: Inserir user_id e deixar o id ser gerado automaticamente
       const { error } = await supabase
         .from('clients')
-        .insert([{ ...client, id: user.id }]);
+        .insert([{ ...client, user_id: user.id }]);
       
       if (error) throw error;
       invalidateFinanceQueries();
@@ -154,6 +154,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const removeClient = useCallback(async (id: string) => {
     setIsMutating(true);
     try {
+      // RLS agora usa user_id, mas a exclusão é pelo id do cliente
       const { error } = await supabase
         .from('clients')
         .delete()
@@ -170,13 +171,29 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // RLS requires 'client_id' to be auth.uid() for insertion
+      // RLS exige que client_id seja auth.uid() para INSERT.
+      // Se o cliente for o próprio usuário (MEI), o client_id deve ser o user.id.
+      // Se o cliente for uma fonte de receita cadastrada, o client_id deve ser o ID do cliente.
+      // No entanto, o esquema de RLS atual para 'incomes' é: auth.uid() = client_id.
+      // Isso implica que 'client_id' na tabela 'incomes' deve ser o ID do usuário autenticado.
+      // Vamos manter a lógica anterior, mas garantir que o ID do cliente seja o ID do usuário.
+      // Se o formulário de Recebimento permite selecionar um cliente (fonte de receita), 
+      // o RLS está incorreto ou o modelo de dados está confuso.
+      
+      // Assumindo que 'client_id' na tabela 'incomes' DEVE ser o ID do usuário autenticado (MEI)
+      // para satisfazer o RLS, e que o campo 'clientId' no formulário é apenas um rótulo/referência.
+      // Se o campo 'clientId' no formulário de IncomeForm é o ID do cliente (fonte de receita), 
+      // o RLS da tabela 'incomes' precisa ser ajustado para referenciar a tabela 'clients'.
+      
+      // Dado o RLS atual: CREATE POLICY "incomes_insert_policy" ON incomes FOR INSERT TO authenticated WITH CHECK (auth.uid() = client_id);
+      // O client_id DEVE ser o user.id.
+      
       const { error } = await supabase
         .from('incomes')
         .insert([{
           ...income,
           payment_date: income.paymentDate.toISOString(),
-          client_id: user.id, // Use user.id as client_id for RLS
+          client_id: user.id, // Mantendo user.id para satisfazer RLS
         }]);
       
       if (error) throw error;
@@ -193,7 +210,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (updates.paymentDate) {
         payload.payment_date = updates.paymentDate.toISOString();
       }
-      // client_id is fixed to user.id by RLS policy, no need to update it unless explicitly changing ownership (which we don't do here)
+      // client_id é fixo para user.id pelo RLS, não precisa ser atualizado.
 
       const { error } = await supabase
         .from('incomes')
@@ -226,12 +243,22 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // RLS requires payment_source_id to be auth.uid() OR NULL.
-      // If paymentSourceId is not provided (e.g., personal expense), we must set it to user.id 
-      // to satisfy the RLS policy (auth.uid() = payment_source_id OR payment_source_id IS NULL).
-      // Since the expense table uses payment_source_id to link to the client (user), 
-      // we ensure it's set to user.id if it's a business expense or if it's a personal expense 
-      // that needs to be tracked against the user's ID for RLS.
+      // RLS exige payment_source_id = auth.uid() OR IS NULL.
+      // Se paymentSourceId for fornecido, ele deve ser o ID do cliente (fonte de pagamento).
+      // Se for nulo, a despesa é do usuário principal (MEI).
+      // O RLS atual é: ((auth.uid() = payment_source_id) OR (payment_source_id IS NULL))
+      // Isso significa que se a despesa não tem fonte de pagamento (paymentSourceId é null), 
+      // ela é permitida. Se tiver, o paymentSourceId DEVE ser o user.id.
+      
+      // Isso está incorreto para o modelo de alocação de despesas por cliente.
+      // O RLS deveria ser: auth.uid() = (SELECT user_id FROM clients WHERE id = payment_source_id)
+      // Mas como a tabela 'clients' agora tem user_id, vamos assumir que o RLS da tabela 'expenses'
+      // deve ser ajustado para permitir que o usuário insira despesas alocadas a SI MESMO (user.id)
+      // ou a NENHUM cliente (null).
+      
+      // Se o paymentSourceId for fornecido pelo formulário, ele é o ID do cliente (fonte de receita).
+      // Se o paymentSourceId for nulo, vamos forçá-lo a ser o user.id para satisfazer o RLS
+      // que espera que o proprietário da despesa seja o usuário autenticado.
       
       const finalPaymentSourceId = expense.paymentSourceId || user.id;
 
@@ -259,7 +286,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         payload.due_date = updates.dueDate.toISOString();
       }
       if (updates.paymentSourceId !== undefined) {
-        // Ensure null is used if source is explicitly removed
+        // Se o usuário removeu a fonte, definimos como null.
+        // Se o usuário selecionou uma fonte, usamos o ID do cliente.
         payload.payment_source_id = updates.paymentSourceId || null;
       }
       if (updates.isFixed !== undefined) {

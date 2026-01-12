@@ -13,7 +13,7 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .eq('id', user.id);
+        .eq('user_id', user.id); // <-- CORREÇÃO: Filtrar por user_id
       
       if (error) throw error;
       return data || [];
