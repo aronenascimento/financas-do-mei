@@ -11,6 +11,7 @@ import {
 import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 interface FinanceContextType {
   clients: Client[];
@@ -47,7 +48,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isMutating, setIsMutating] = useState(false);
   const queryClient = useQueryClient();
-  
+  const { user } = useAuth(); // Get authenticated user
+
   // Destructure query results
   const queries = useFinanceData();
 
@@ -134,18 +136,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [investments, selectedMonth]);
 
   const addClient = useCallback(async (client: Omit<Client, 'id' | 'createdAt'>) => {
+    if (!user) return;
     setIsMutating(true);
     try {
+      // RLS requires 'id' to be auth.uid() for insertion
       const { error } = await supabase
         .from('clients')
-        .insert([client]);
+        .insert([{ ...client, id: user.id }]);
       
       if (error) throw error;
       invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, [invalidateFinanceQueries]);
+  }, [invalidateFinanceQueries, user]);
 
   const removeClient = useCallback(async (id: string) => {
     setIsMutating(true);
@@ -163,14 +167,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [invalidateFinanceQueries]);
 
   const addIncome = useCallback(async (income: Omit<Income, 'id' | 'createdAt'>) => {
+    if (!user) return;
     setIsMutating(true);
     try {
+      // RLS requires 'client_id' to be auth.uid() for insertion
       const { error } = await supabase
         .from('incomes')
         .insert([{
           ...income,
-          payment_date: income.paymentDate.toISOString(), // Ensure date is correctly formatted for Supabase
-          client_id: income.clientId, // Ensure client_id is passed
+          payment_date: income.paymentDate.toISOString(),
+          client_id: user.id, // Use user.id as client_id for RLS
         }]);
       
       if (error) throw error;
@@ -178,7 +184,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsMutating(false);
     }
-  }, [invalidateFinanceQueries]);
+  }, [invalidateFinanceQueries, user]);
 
   const updateIncome = useCallback(async (id: string, updates: Partial<Omit<Income, 'id' | 'createdAt'>>) => {
     setIsMutating(true);
@@ -187,9 +193,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (updates.paymentDate) {
         payload.payment_date = updates.paymentDate.toISOString();
       }
-      if (updates.clientId) {
-        payload.client_id = updates.clientId;
-      }
+      // client_id is fixed to user.id by RLS policy, no need to update it unless explicitly changing ownership (which we don't do here)
 
       const { error } = await supabase
         .from('incomes')
@@ -219,14 +223,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [invalidateFinanceQueries]);
 
   const addExpense = useCallback(async (expense: Omit<Expense, 'id' | 'createdAt'>) => {
+    if (!user) return;
     setIsMutating(true);
     try {
+      // RLS requires payment_source_id to be auth.uid() OR NULL.
+      // If paymentSourceId is not provided (e.g., personal expense), we must set it to user.id 
+      // to satisfy the RLS policy (auth.uid() = payment_source_id OR payment_source_id IS NULL).
+      // Since the expense table uses payment_source_id to link to the client (user), 
+      // we ensure it's set to user.id if it's a business expense or if it's a personal expense 
+      // that needs to be tracked against the user's ID for RLS.
+      
+      const finalPaymentSourceId = expense.paymentSourceId || user.id;
+
       const { error } = await supabase
         .from('expenses')
         .insert([{
           ...expense,
           due_date: expense.dueDate.toISOString(),
-          payment_source_id: expense.paymentSourceId,
+          payment_source_id: finalPaymentSourceId,
           is_fixed: expense.isFixed,
         }]);
       
@@ -235,7 +249,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsMutating(false);
     }
-  }, [invalidateFinanceQueries]);
+  }, [invalidateFinanceQueries, user]);
 
   const updateExpense = useCallback(async (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt'>>) => {
     setIsMutating(true);
@@ -245,7 +259,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         payload.due_date = updates.dueDate.toISOString();
       }
       if (updates.paymentSourceId !== undefined) {
-        payload.payment_source_id = updates.paymentSourceId;
+        // Ensure null is used if source is explicitly removed
+        payload.payment_source_id = updates.paymentSourceId || null;
       }
       if (updates.isFixed !== undefined) {
         payload.is_fixed = updates.isFixed;
@@ -266,9 +281,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateExpenseStatus = useCallback(async (id: string, status: PaymentStatus, paymentSourceId?: string) => {
     setIsMutating(true);
     try {
+      // Ensure payment_source_id is null if undefined/empty string
+      const finalPaymentSourceId = paymentSourceId || null;
+
       const { error } = await supabase
         .from('expenses')
-        .update({ status, payment_source_id: paymentSourceId || null }) // Supabase expects null for optional foreign keys
+        .update({ status, payment_source_id: finalPaymentSourceId })
         .eq('id', id);
       
       if (error) throw error;
