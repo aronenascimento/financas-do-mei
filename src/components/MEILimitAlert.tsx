@@ -57,19 +57,20 @@ const setAlertShown = (alertKey: keyof AlertsShown) => {
 
 export function MEILimitAlert() {
   const { meiLimits, isLoading } = useFinance();
-  const [alertsShown, setAlertsShown] = useState<AlertsShown>(getAlertsShown);
+  const [alertsShown, setAlertsShown] = useState<AlertsShown>(getAlertsShown());
 
   if (isLoading || !meiLimits) {
     // Render skeleton or null while loading
     return null;
   }
 
+  // CORREÇÃO: Adicionar valor padrão para problematic_categories
   const { 
     accumulated_income: accumulated, 
     projection, 
     percentage, 
     projection_percentage: projectionPercentage, 
-    problematic_categories: problematicCategories,
+    problematic_categories: problematicCategories = [], 
     zone,
     status
   } = meiLimits;
@@ -307,8 +308,8 @@ export function MEILimitAlert() {
           )}
         </div>
 
-        {/* Problematic Categories Alert */}
-        {problematicCategories.length > 0 && (
+        {/* CORREÇÃO: Usar optional chaining para segurança extra */}
+        {problematicCategories?.length > 0 && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 sm:p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
               <AlertTriangle className="w-4 h-4" />

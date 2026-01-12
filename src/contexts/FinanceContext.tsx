@@ -7,12 +7,12 @@ import {
   Investment, 
   FinancialSummary, 
   PaymentStatus,
-  MEILimitData // Import MEILimitData from types
+  MEILimitData 
 } from '@/types/finance';
-import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear, isValid } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
 
 
 interface FinanceContextType {
@@ -24,7 +24,7 @@ interface FinanceContextType {
   filteredExpenses: Expense[];
   filteredInvestments: Investment[];
   selectedMonth: Date;
-  meiLimits: MEILimitData | null; // Exposed MEI Limits data
+  meiLimits: MEILimitData | null;
   setSelectedMonth: (date: Date) => void;
   addClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<void>;
   removeClient: (id: string) => Promise<void>;
@@ -51,12 +51,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isMutating, setIsMutating] = useState(false);
   const queryClient = useQueryClient();
-  const { user } = useAuth(); // Get authenticated user
+  const { user } = useAuth();
 
-  // Destructure query results
   const queries = useFinanceData();
 
-  // Extract data and calculate combined loading state
   const clients = (queries.clients.data as Client[] | undefined) || [];
   const incomes = (queries.incomes.data as Income[] | undefined) || [];
   const expenses = (queries.expenses.data as Expense[] | undefined) || [];
@@ -65,7 +63,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   
   const isLoading = queries.clients.isLoading || queries.incomes.isLoading || queries.expenses.isLoading || queries.investments.isLoading || queries.meiLimits.isLoading;
 
-  // Helper to invalidate all relevant queries
   const invalidateFinanceQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['clients'] });
     queryClient.invalidateQueries({ queryKey: ['incomes'] });
@@ -78,11 +75,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['mei-limits'] });
   }, [queryClient]);
 
-
-  // Filtered data by selected month (including fixed expenses projected to current month)
+  // CORREÇÃO: Adicionar validação de datas para evitar RangeError
   const filteredIncomes = useMemo(() => {
     return incomes.filter(income => {
       const incomeDate = new Date(income.paymentDate);
+      // Proteção contra data inválida
+      if (!isValid(incomeDate)) return false; 
+      
       const start = startOfMonth(selectedMonth);
       const end = endOfMonth(selectedMonth);
       return isWithinInterval(incomeDate, { start, end });
@@ -95,6 +94,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     
     return expenses.filter(expense => {
       const expenseDate = new Date(expense.dueDate);
+      
+      // CORREÇÃO: Proteção contra data inválida
+      if (!isValid(expenseDate)) return false;
       
       // If it's in the selected month, show it
       if (isWithinInterval(expenseDate, { 
@@ -130,6 +132,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const filteredInvestments = useMemo(() => {
     return investments.filter(investment => {
       const investmentDate = new Date(investment.date);
+      // CORREÇÃO: Proteção contra data inválida
+      if (!isValid(investmentDate)) return false;
+      
       const start = startOfMonth(selectedMonth);
       const end = endOfMonth(selectedMonth);
       return isWithinInterval(investmentDate, { start, end });
@@ -140,7 +145,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // Inserir user_id e deixar o id ser gerado automaticamente
       const { error } = await supabase
         .from('clients')
         .insert([{ ...client, user_id: user.id }]);
@@ -171,14 +175,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // Usar o clientId selecionado no formulário (ID do cliente)
       const { error } = await supabase
         .from('incomes')
         .insert([{
           ...income,
-          user_id: user.id, // CRITICAL FIX: Add user_id for RLS enforcement
+          user_id: user.id,
           payment_date: income.paymentDate.toISOString(),
-          client_id: income.clientId, // ID do cliente
+          client_id: income.clientId,
         }]);
       
       if (error) throw error;
@@ -230,14 +233,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // paymentSourceId é o ID do cliente ou null
       const finalPaymentSourceId = expense.paymentSourceId || null;
 
       const { error } = await supabase
         .from('expenses')
         .insert([{
           ...expense,
-          user_id: user.id, // CRITICAL FIX: Add user_id for RLS enforcement
+          user_id: user.id,
           due_date: expense.dueDate.toISOString(),
           payment_source_id: finalPaymentSourceId,
           is_fixed: expense.isFixed,
@@ -258,7 +260,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         payload.due_date = updates.dueDate.toISOString();
       }
       if (updates.paymentSourceId !== undefined) {
-        // Se o usuário removeu a fonte, definimos como null.
         payload.payment_source_id = updates.paymentSourceId || null;
       }
       if (updates.isFixed !== undefined) {
@@ -280,7 +281,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const updateExpenseStatus = useCallback(async (id: string, status: PaymentStatus, paymentSourceId?: string | null) => {
     setIsMutating(true);
     try {
-      // Ensure payment_source_id is null if undefined/empty string
       const finalPaymentSourceId = paymentSourceId || null;
 
       const { error } = await supabase
@@ -314,12 +314,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // Inserir user_id e deixar o id ser gerado automaticamente
       const { error } = await supabase
         .from('investments')
         .insert([{
           ...investment,
-          user_id: user.id, // Adicionando user_id
+          user_id: user.id,
           date: investment.date.toISOString(),
         }]);
       
@@ -370,7 +369,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       .filter(e => e.status === 'saved')
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Calculate expenses by payment source
     const expensesBySource: Record<string, number> = {};
     typeFilteredExpenses.forEach(e => {
       if (e.paymentSourceId) {
@@ -378,25 +376,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Saques são despesas empresariais com categoria "Saque"
     const totalWithdrawals = filteredExpenses
       .filter(e => e.type === 'business' && e.category === 'Saque' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Despesas empresariais SEM contar os saques
     const businessExpensesWithoutWithdrawals = filteredExpenses
       .filter(e => e.type === 'business' && e.category !== 'Saque')
       .reduce((sum, e) => sum + e.amount, 0);
     
-    // Despesas pessoais pagas
     const personalPaidExpenses = filteredExpenses
       .filter(e => e.type === 'personal' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Caixa empresa = Receita - Despesas empresa (incluindo saques) - Investimentos
     const businessBalance = totalIncome - businessExpensesWithoutWithdrawals - totalWithdrawals - totalInvestments;
-    
-    // Disponível pessoal = Saques - Despesas pessoais pagas
     const personalBalance = totalWithdrawals - personalPaidExpenses;
 
     return {
@@ -430,7 +422,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       filteredInvestments,
       selectedMonth,
       setSelectedMonth,
-      meiLimits, // Expose meiLimits
+      meiLimits,
       addClient,
       removeClient,
       addIncome,
