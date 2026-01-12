@@ -80,9 +80,9 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
+      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_financial_summary', {
-          user_id: user.id,
           target_month: currentMonth,
           target_year: currentYear,
         });
@@ -98,9 +98,9 @@ export function useFinanceData() {
     queryFn: async () => {
       if (!user) return [];
       
+      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_evolution_data', {
-          user_id: user.id,
           months_back: 12,
         });
       
@@ -118,9 +118,9 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
+      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_expense_categories', {
-          user_id: user.id,
           target_month: currentMonth,
           target_year: currentYear,
         });
@@ -139,9 +139,9 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
+      // RPC call updated: removed user_id parameter
       const { data, error } = await supabase
         .rpc('get_client_expense_allocation', {
-          user_id: user.id,
           target_month: currentMonth,
           target_year: currentYear,
         });
@@ -157,6 +157,7 @@ export function useFinanceData() {
     queryFn: async () => {
       if (!user) return null;
       
+      // RPC call updated: no parameters needed, function uses auth.uid() internally
       const { data, error } = await supabase
         .rpc('check_mei_limits');
       
