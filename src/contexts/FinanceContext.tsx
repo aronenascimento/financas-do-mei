@@ -10,6 +10,7 @@ import {
 } from '@/types/finance';
 import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface FinanceContextType {
   clients: Client[];
@@ -45,6 +46,7 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isMutating, setIsMutating] = useState(false);
+  const queryClient = useQueryClient();
   
   // Destructure query results
   const queries = useFinanceData();
@@ -56,6 +58,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const investments = (queries.investments.data as Investment[] | undefined) || [];
   
   const isLoading = queries.clients.isLoading || queries.incomes.isLoading || queries.expenses.isLoading || queries.investments.isLoading;
+
+  // Helper to invalidate all relevant queries
+  const invalidateFinanceQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['clients'] });
+    queryClient.invalidateQueries({ queryKey: ['incomes'] });
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    queryClient.invalidateQueries({ queryKey: ['investments'] });
+    queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+    queryClient.invalidateQueries({ queryKey: ['evolution-data'] });
+    queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
+    queryClient.invalidateQueries({ queryKey: ['client-allocation'] });
+    queryClient.invalidateQueries({ queryKey: ['mei-limits'] });
+  }, [queryClient]);
 
 
   // Filtered data by selected month (including fixed expenses projected to current month)
@@ -126,10 +141,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .insert([client]);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const removeClient = useCallback(async (id: string) => {
     setIsMutating(true);
@@ -140,37 +156,52 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const addIncome = useCallback(async (income: Omit<Income, 'id' | 'createdAt'>) => {
     setIsMutating(true);
     try {
       const { error } = await supabase
         .from('incomes')
-        .insert([income]);
+        .insert([{
+          ...income,
+          payment_date: income.paymentDate.toISOString(), // Ensure date is correctly formatted for Supabase
+          client_id: income.clientId, // Ensure client_id is passed
+        }]);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const updateIncome = useCallback(async (id: string, updates: Partial<Omit<Income, 'id' | 'createdAt'>>) => {
     setIsMutating(true);
     try {
+      const payload: Record<string, any> = { ...updates };
+      if (updates.paymentDate) {
+        payload.payment_date = updates.paymentDate.toISOString();
+      }
+      if (updates.clientId) {
+        payload.client_id = updates.clientId;
+      }
+
       const { error } = await supabase
         .from('incomes')
-        .update(updates)
+        .update(payload)
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const removeIncome = useCallback(async (id: string) => {
     setIsMutating(true);
@@ -181,51 +212,71 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const addExpense = useCallback(async (expense: Omit<Expense, 'id' | 'createdAt'>) => {
     setIsMutating(true);
     try {
       const { error } = await supabase
         .from('expenses')
-        .insert([expense]);
+        .insert([{
+          ...expense,
+          due_date: expense.dueDate.toISOString(),
+          payment_source_id: expense.paymentSourceId,
+          is_fixed: expense.isFixed,
+        }]);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const updateExpense = useCallback(async (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt'>>) => {
     setIsMutating(true);
     try {
+      const payload: Record<string, any> = { ...updates };
+      if (updates.dueDate) {
+        payload.due_date = updates.dueDate.toISOString();
+      }
+      if (updates.paymentSourceId !== undefined) {
+        payload.payment_source_id = updates.paymentSourceId;
+      }
+      if (updates.isFixed !== undefined) {
+        payload.is_fixed = updates.isFixed;
+      }
+
       const { error } = await supabase
         .from('expenses')
-        .update(updates)
+        .update(payload)
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const updateExpenseStatus = useCallback(async (id: string, status: PaymentStatus, paymentSourceId?: string) => {
     setIsMutating(true);
     try {
       const { error } = await supabase
         .from('expenses')
-        .update({ status, payment_source_id: paymentSourceId })
+        .update({ status, payment_source_id: paymentSourceId || null }) // Supabase expects null for optional foreign keys
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const removeExpense = useCallback(async (id: string) => {
     setIsMutating(true);
@@ -236,23 +287,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const addInvestment = useCallback(async (investment: Omit<Investment, 'id' | 'createdAt'>) => {
     setIsMutating(true);
     try {
       const { error } = await supabase
         .from('investments')
-        .insert([investment]);
+        .insert([{
+          ...investment,
+          date: investment.date.toISOString(),
+        }]);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const removeInvestment = useCallback(async (id: string) => {
     setIsMutating(true);
@@ -263,10 +319,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .eq('id', id);
       
       if (error) throw error;
+      invalidateFinanceQueries();
     } finally {
       setIsMutating(false);
     }
-  }, []);
+  }, [invalidateFinanceQueries]);
 
   const getClientById = useCallback((id: string) => {
     // Fix 7: using 'clients' array
