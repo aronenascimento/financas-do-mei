@@ -28,9 +28,9 @@ interface FinanceContextType {
   addIncome: (income: Omit<Income, 'id' | 'createdAt'>) => Promise<void>;
   updateIncome: (id: string, income: Partial<Omit<Income, 'id' | 'createdAt'>>) => Promise<void>;
   removeIncome: (id: string) => Promise<void>;
-  addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => Promise<void>;
-  updateExpense: (id: string, expense: Partial<Omit<Expense, 'id' | 'createdAt'>>) => Promise<void>;
-  updateExpenseStatus: (id: string, status: PaymentStatus, paymentSourceId?: string) => Promise<void>;
+  addExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'> & { paymentSourceId?: string | null }) => Promise<void>;
+  updateExpense: (id: string, expense: Partial<Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'>> & { paymentSourceId?: string | null }) => Promise<void>;
+  updateExpenseStatus: (id: string, status: PaymentStatus, paymentSourceId?: string | null) => Promise<void>;
   removeExpense: (id: string) => Promise<void>;
   addInvestment: (investment: Omit<Investment, 'id' | 'createdAt'>) => Promise<void>;
   removeInvestment: (id: string) => Promise<void>;
@@ -53,7 +53,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   // Destructure query results
   const queries = useFinanceData();
 
-  // Extract data and calculate combined loading state (Fix 3, 8, 9, 10, 11)
+  // Extract data and calculate combined loading state
   const clients = (queries.clients.data as Client[] | undefined) || [];
   const incomes = (queries.incomes.data as Income[] | undefined) || [];
   const expenses = (queries.expenses.data as Expense[] | undefined) || [];
@@ -77,7 +77,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // Filtered data by selected month (including fixed expenses projected to current month)
   const filteredIncomes = useMemo(() => {
-    // Fix 4: using 'incomes' array
     return incomes.filter(income => {
       const incomeDate = new Date(income.paymentDate);
       const start = startOfMonth(selectedMonth);
@@ -90,7 +89,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const targetMonth = getMonth(selectedMonth);
     const targetYear = getYear(selectedMonth);
     
-    // Fix 5: using 'expenses' array
     return expenses.filter(expense => {
       const expenseDate = new Date(expense.dueDate);
       
@@ -126,7 +124,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [expenses, selectedMonth]);
 
   const filteredInvestments = useMemo(() => {
-    // Fix 6: using 'investments' array
     return investments.filter(investment => {
       const investmentDate = new Date(investment.date);
       const start = startOfMonth(selectedMonth);
@@ -139,7 +136,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // CORREÇÃO: Inserir user_id e deixar o id ser gerado automaticamente
+      // Inserir user_id e deixar o id ser gerado automaticamente
       const { error } = await supabase
         .from('clients')
         .insert([{ ...client, user_id: user.id }]);
@@ -154,7 +151,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const removeClient = useCallback(async (id: string) => {
     setIsMutating(true);
     try {
-      // RLS agora usa user_id, mas a exclusão é pelo id do cliente
       const { error } = await supabase
         .from('clients')
         .delete()
@@ -171,14 +167,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // CORREÇÃO: Usar o clientId selecionado no formulário, que agora é o ID do cliente (UUID)
-      // O RLS foi corrigido para verificar se este client_id pertence ao user.id
+      // Usar o clientId selecionado no formulário (ID do cliente)
       const { error } = await supabase
         .from('incomes')
         .insert([{
           ...income,
           payment_date: income.paymentDate.toISOString(),
-          client_id: income.clientId, // Usar o ID do cliente selecionado
+          client_id: income.clientId, // ID do cliente
         }]);
       
       if (error) throw error;
@@ -226,14 +221,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [invalidateFinanceQueries]);
 
-  const addExpense = useCallback(async (expense: Omit<Expense, 'id' | 'createdAt'>) => {
+  const addExpense = useCallback(async (expense: Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'> & { paymentSourceId?: string | null }) => {
     if (!user) return;
     setIsMutating(true);
     try {
-      // O RLS de expenses foi corrigido para permitir payment_source_id = ID do cliente OU NULL.
-      // Se paymentSourceId for fornecido, ele é o ID do cliente (fonte de receita).
-      // Se for nulo, a despesa é do usuário principal (MEI).
-      
+      // paymentSourceId é o ID do cliente ou null
       const finalPaymentSourceId = expense.paymentSourceId || null;
 
       const { error } = await supabase
@@ -252,7 +244,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [invalidateFinanceQueries, user]);
 
-  const updateExpense = useCallback(async (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt'>>) => {
+  const updateExpense = useCallback(async (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'>> & { paymentSourceId?: string | null }) => {
     setIsMutating(true);
     try {
       const payload: Record<string, any> = { ...updates };
@@ -261,7 +253,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
       if (updates.paymentSourceId !== undefined) {
         // Se o usuário removeu a fonte, definimos como null.
-        // Se o usuário selecionou uma fonte, usamos o ID do cliente.
         payload.payment_source_id = updates.paymentSourceId || null;
       }
       if (updates.isFixed !== undefined) {
@@ -280,7 +271,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [invalidateFinanceQueries]);
 
-  const updateExpenseStatus = useCallback(async (id: string, status: PaymentStatus, paymentSourceId?: string) => {
+  const updateExpenseStatus = useCallback(async (id: string, status: PaymentStatus, paymentSourceId?: string | null) => {
     setIsMutating(true);
     try {
       // Ensure payment_source_id is null if undefined/empty string
@@ -314,12 +305,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [invalidateFinanceQueries]);
 
   const addInvestment = useCallback(async (investment: Omit<Investment, 'id' | 'createdAt'>) => {
+    if (!user) return;
     setIsMutating(true);
     try {
+      // Inserir user_id e deixar o id ser gerado automaticamente
       const { error } = await supabase
         .from('investments')
         .insert([{
           ...investment,
+          user_id: user.id, // Adicionando user_id
           date: investment.date.toISOString(),
         }]);
       
@@ -328,7 +322,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsMutating(false);
     }
-  }, [invalidateFinanceQueries]);
+  }, [invalidateFinanceQueries, user]);
 
   const removeInvestment = useCallback(async (id: string) => {
     setIsMutating(true);
@@ -346,7 +340,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [invalidateFinanceQueries]);
 
   const getClientById = useCallback((id: string) => {
-    // Fix 7: using 'clients' array
     return clients.find(c => c.id === id);
   }, [clients]);
 

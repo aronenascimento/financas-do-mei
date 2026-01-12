@@ -13,7 +13,7 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .eq('user_id', user.id); // <-- CORREÇÃO: Filtrar por user_id
+        .eq('user_id', user.id); // <-- Filtrar por user_id
       
       if (error) throw error;
       return data || [];
@@ -29,7 +29,7 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('incomes')
         .select('*')
-        .eq('client_id', user.id)
+        // RLS agora filtra por client_id pertencente ao user.id, então não precisamos de filtro aqui.
         .order('payment_date', { ascending: false });
       
       if (error) throw error;
@@ -46,7 +46,7 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('expenses')
         .select('*')
-        .or(`payment_source_id.eq.${user.id},payment_source_id.is.null`)
+        // RLS agora filtra por payment_source_id pertencente ao user.id's clients OU NULL.
         .order('due_date', { ascending: false });
       
       if (error) throw error;
@@ -63,6 +63,7 @@ export function useFinanceData() {
       const { data, error } = await supabase
         .from('investments')
         .select('*')
+        .eq('user_id', user.id) // <-- Filtrar por user_id
         .order('date', { ascending: false });
       
       if (error) throw error;
