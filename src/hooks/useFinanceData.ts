@@ -109,31 +109,14 @@ export function useFinanceData() {
     enabled: !!user,
   });
 
-  const financialSummary = useQuery({
-    queryKey: ['financial-summary'],
-    queryFn: async () => {
-      if (!user) return null;
-      
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
-      
-      const { data, error } = await supabase
-        .rpc('get_financial_summary', {
-          target_month: currentMonth,
-          target_year: currentYear,
-        });
-      
-      if (error) throw error;
-      return data && data[0] ? data[0] : null;
-    },
-    enabled: !!user,
-  });
+  // --- RPC Calls (using current month/year for initial load) ---
 
   const evolutionData = useQuery({
     queryKey: ['evolution-data'],
     queryFn: async () => {
       if (!user) return [];
       
+      // RPC get_evolution_data agora aceita apenas months_back (default 12)
       const { data, error } = await supabase
         .rpc('get_evolution_data', {
           months_back: 12,
@@ -153,6 +136,7 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
+      // RPC get_expense_categories agora aceita target_month e target_year
       const { data, error } = await supabase
         .rpc('get_expense_categories', {
           target_month: currentMonth,
@@ -173,6 +157,7 @@ export function useFinanceData() {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
+      // RPC get_client_expense_allocation agora aceita target_month e target_year
       const { data, error } = await supabase
         .rpc('get_client_expense_allocation', {
           target_month: currentMonth,
@@ -190,6 +175,7 @@ export function useFinanceData() {
     queryFn: async () => {
       if (!user) return null;
       
+      // RPC check_mei_limits não aceita argumentos
       const { data, error } = await supabase
         .rpc('check_mei_limits');
       
@@ -204,7 +190,6 @@ export function useFinanceData() {
     incomes,
     expenses,
     investments,
-    financialSummary,
     evolutionData,
     expenseCategories,
     clientAllocation,

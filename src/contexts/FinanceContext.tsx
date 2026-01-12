@@ -68,7 +68,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ['incomes'] });
     queryClient.invalidateQueries({ queryKey: ['expenses'] });
     queryClient.invalidateQueries({ queryKey: ['investments'] });
-    queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+    // financial-summary query was removed, updating dependencies
     queryClient.invalidateQueries({ queryKey: ['evolution-data'] });
     queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
     queryClient.invalidateQueries({ queryKey: ['client-allocation'] });
@@ -380,7 +380,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       .filter(e => e.type === 'business' && e.category === 'Saque' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
 
-    const businessExpensesWithoutWithdrawals = filteredExpenses
+    const business ExpensesWithoutWithdrawals = filteredExpenses
       .filter(e => e.type === 'business' && e.category !== 'Saque')
       .reduce((sum, e) => sum + e.amount, 0);
     
