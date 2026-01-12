@@ -171,29 +171,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // RLS exige que client_id seja auth.uid() para INSERT.
-      // Se o cliente for o próprio usuário (MEI), o client_id deve ser o user.id.
-      // Se o cliente for uma fonte de receita cadastrada, o client_id deve ser o ID do cliente.
-      // No entanto, o esquema de RLS atual para 'incomes' é: auth.uid() = client_id.
-      // Isso implica que 'client_id' na tabela 'incomes' deve ser o ID do usuário autenticado.
-      // Vamos manter a lógica anterior, mas garantir que o ID do cliente seja o ID do usuário.
-      // Se o formulário de Recebimento permite selecionar um cliente (fonte de receita), 
-      // o RLS está incorreto ou o modelo de dados está confuso.
-      
-      // Assumindo que 'client_id' na tabela 'incomes' DEVE ser o ID do usuário autenticado (MEI)
-      // para satisfazer o RLS, e que o campo 'clientId' no formulário é apenas um rótulo/referência.
-      // Se o campo 'clientId' no formulário de IncomeForm é o ID do cliente (fonte de receita), 
-      // o RLS da tabela 'incomes' precisa ser ajustado para referenciar a tabela 'clients'.
-      
-      // Dado o RLS atual: CREATE POLICY "incomes_insert_policy" ON incomes FOR INSERT TO authenticated WITH CHECK (auth.uid() = client_id);
-      // O client_id DEVE ser o user.id.
-      
+      // CORREÇÃO: Usar o clientId selecionado no formulário, que agora é o ID do cliente (UUID)
+      // O RLS foi corrigido para verificar se este client_id pertence ao user.id
       const { error } = await supabase
         .from('incomes')
         .insert([{
           ...income,
           payment_date: income.paymentDate.toISOString(),
-          client_id: user.id, // Mantendo user.id para satisfazer RLS
+          client_id: income.clientId, // Usar o ID do cliente selecionado
         }]);
       
       if (error) throw error;
@@ -210,7 +195,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (updates.paymentDate) {
         payload.payment_date = updates.paymentDate.toISOString();
       }
-      // client_id é fixo para user.id pelo RLS, não precisa ser atualizado.
+      if (updates.clientId !== undefined) {
+        payload.client_id = updates.clientId;
+      }
 
       const { error } = await supabase
         .from('incomes')
@@ -243,24 +230,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsMutating(true);
     try {
-      // RLS exige payment_source_id = auth.uid() OR IS NULL.
-      // Se paymentSourceId for fornecido, ele deve ser o ID do cliente (fonte de pagamento).
+      // O RLS de expenses foi corrigido para permitir payment_source_id = ID do cliente OU NULL.
+      // Se paymentSourceId for fornecido, ele é o ID do cliente (fonte de receita).
       // Se for nulo, a despesa é do usuário principal (MEI).
-      // O RLS atual é: ((auth.uid() = payment_source_id) OR (payment_source_id IS NULL))
-      // Isso significa que se a despesa não tem fonte de pagamento (paymentSourceId é null), 
-      // ela é permitida. Se tiver, o paymentSourceId DEVE ser o user.id.
       
-      // Isso está incorreto para o modelo de alocação de despesas por cliente.
-      // O RLS deveria ser: auth.uid() = (SELECT user_id FROM clients WHERE id = payment_source_id)
-      // Mas como a tabela 'clients' agora tem user_id, vamos assumir que o RLS da tabela 'expenses'
-      // deve ser ajustado para permitir que o usuário insira despesas alocadas a SI MESMO (user.id)
-      // ou a NENHUM cliente (null).
-      
-      // Se o paymentSourceId for fornecido pelo formulário, ele é o ID do cliente (fonte de receita).
-      // Se o paymentSourceId for nulo, vamos forçá-lo a ser o user.id para satisfazer o RLS
-      // que espera que o proprietário da despesa seja o usuário autenticado.
-      
-      const finalPaymentSourceId = expense.paymentSourceId || user.id;
+      const finalPaymentSourceId = expense.paymentSourceId || null;
 
       const { error } = await supabase
         .from('expenses')
