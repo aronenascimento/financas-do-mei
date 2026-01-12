@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const MEI_MONTHLY_LIMIT = 6750;
@@ -36,12 +36,19 @@ export function EvolutionChart() {
       const start = startOfMonth(monthDate);
       const end = endOfMonth(monthDate);
 
-      const monthIncomes = incomes.filter((income) =>
-        isWithinInterval(new Date(income.paymentDate), { start, end })
-      );
-      const monthExpenses = expenses.filter((expense) =>
-        isWithinInterval(new Date(expense.dueDate), { start, end })
-      );
+      const monthIncomes = incomes.filter((income) => {
+        // INICIO DA CORREÇÃO
+        const date = new Date(income.paymentDate);
+        return isValid(date) && isWithinInterval(date, { start, end });
+        // FIM DA CORREÇÃO
+      });
+
+      const monthExpenses = expenses.filter((expense) => {
+        // INICIO DA CORREÇÃO
+        const date = new Date(expense.dueDate);
+        return isValid(date) && isWithinInterval(date, { start, end });
+        // FIM DA CORREÇÃO
+      });
 
       const receitas = monthIncomes.reduce((sum, i) => sum + i.amount, 0);
       const despesas = monthExpenses.reduce((sum, e) => sum + e.amount, 0);

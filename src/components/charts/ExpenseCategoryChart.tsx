@@ -8,6 +8,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { isValid } from "date-fns";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -35,6 +36,10 @@ export function ExpenseCategoryChart() {
     const categoryTotals: Record<string, number> = {};
     
     filteredExpenses.forEach((expense) => {
+      // Adicionar validação de data
+      const expenseDate = new Date(expense.dueDate);
+      if (!isValid(expenseDate)) return;
+      
       categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
     });
 
