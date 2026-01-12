@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useFinance } from "@/contexts/FinanceContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -24,17 +24,8 @@ import { Button } from "@/components/ui/button";
 
 const MEI_LIMITS = {
   annual: 81000,
-  alert70: 56700,
-  alert90: 72900,
   tolerance: 97200,
-  monthlyAverage: 6750
 };
-
-const PROBLEMATIC_CATEGORIES = [
-  "Importação",
-  "Revenda de produtos não permitidos",
-  "Serviços financeiros"
-];
 
 const CURRENT_YEAR = 2026;
 const STORAGE_KEY = `mei_alerts_shown_${CURRENT_YEAR}`;
@@ -65,104 +56,74 @@ const setAlertShown = (alertKey: keyof AlertsShown) => {
 };
 
 export function MEILimitAlert() {
-  const { incomes } = useFinance();
+  const { meiLimits, isLoading } = useFinance();
   const [alertsShown, setAlertsShown] = useState<AlertsShown>(getAlertsShown);
 
-  // Calculate accumulated revenue for the current year
-  const yearlyData = useMemo(() => {
-    const today = new Date();
-    const startOfYear = new Date(CURRENT_YEAR, 0, 1);
-    
-    // Filter incomes from Jan 1 to today
-    const yearIncomes = incomes.filter(income => {
-      const incomeDate = new Date(income.paymentDate);
-      return incomeDate >= startOfYear && incomeDate <= today;
-    });
+  if (isLoading || !meiLimits) {
+    // Render skeleton or null while loading
+    return null;
+  }
 
-    const accumulated = yearIncomes.reduce((sum, income) => sum + income.amount, 0);
-    const currentMonth = today.getMonth() + 1; // 1-12
-    const projection = currentMonth > 0 ? (accumulated / currentMonth) * 12 : 0;
-    const percentage = (accumulated / MEI_LIMITS.annual) * 100;
-    const projectionPercentage = (projection / MEI_LIMITS.annual) * 100;
+  const { 
+    accumulated_income: accumulated, 
+    projection, 
+    percentage, 
+    projection_percentage: projectionPercentage, 
+    problematic_categories: problematicCategories,
+    zone,
+    status
+  } = meiLimits;
 
-    // Check for problematic categories
-    const problematicIncomes = yearIncomes.filter(income => 
-      PROBLEMATIC_CATEGORIES.includes(income.category)
-    );
-    const problematicCategories = [...new Set(problematicIncomes.map(i => i.category))];
-
-    return {
-      accumulated,
-      projection,
-      percentage,
-      projectionPercentage,
-      currentMonth,
-      problematicCategories,
-      yearIncomes
-    };
-  }, [incomes]);
-
-  const { accumulated, projection, percentage, projectionPercentage, problematicCategories } = yearlyData;
-
-  // Determine zone and colors
+  // Determine zone colors based on server-provided zone
   const getZoneInfo = () => {
-    if (percentage >= 120) {
-      return {
-        zone: 'critical',
-        color: 'bg-red-800',
-        borderColor: 'border-red-800',
-        textColor: 'text-red-800',
-        status: '🚫 CRÍTICO: Você ultrapassou a margem de tolerância',
-        icon: Ban
-      };
-    } else if (percentage >= 100) {
-      return {
-        zone: 'exceeded',
-        color: 'bg-red-500',
-        borderColor: 'border-red-500',
-        textColor: 'text-red-500',
-        status: '❌ Limite ultrapassado! Você tem até R$ 97.200 antes de penalidades',
-        icon: XCircle
-      };
-    } else if (percentage >= 90) {
-      return {
-        zone: 'urgent',
-        color: 'bg-orange-500',
-        borderColor: 'border-orange-500',
-        textColor: 'text-orange-500',
-        status: '🚨 Urgente: você já utilizou 90% do limite anual',
-        icon: AlertCircle
-      };
-    } else if (percentage >= 70) {
-      return {
-        zone: 'attention',
-        color: 'bg-yellow-500',
-        borderColor: 'border-yellow-500',
-        textColor: 'text-yellow-500',
-        status: '⚠️ Atenção: você já utilizou 70% do limite anual',
-        icon: AlertTriangle
-      };
-    } else {
-      return {
-        zone: 'safe',
-        color: 'bg-green-500',
-        borderColor: 'border-green-500/30',
-        textColor: 'text-green-600',
-        status: '✅ Você está na zona segura',
-        icon: Target
-      };
+    switch (zone) {
+      case 'critical':
+        return {
+          color: 'bg-red-800',
+          borderColor: 'border-red-800',
+          textColor: 'text-red-800',
+          icon: Ban
+        };
+      case 'exceeded':
+        return {
+          color: 'bg-red-500',
+          borderColor: 'border-red-500',
+          textColor: 'text-red-500',
+          icon: XCircle
+        };
+      case 'urgent':
+        return {
+          color: 'bg-orange-500',
+          borderColor: 'border-orange-500',
+          textColor: 'text-orange-500',
+          icon: AlertCircle
+        };
+      case 'attention':
+        return {
+          color: 'bg-yellow-500',
+          borderColor: 'border-yellow-500',
+          textColor: 'text-yellow-500',
+          icon: AlertTriangle
+        };
+      default:
+        return {
+          color: 'bg-green-500',
+          borderColor: 'border-green-500/30',
+          textColor: 'text-green-600',
+          icon: Target
+        };
     }
   };
 
   const zoneInfo = getZoneInfo();
 
-  // Calculate remaining amount to next threshold
+  // Calculate remaining amount to next threshold (using server percentage)
   const getRemainingInfo = () => {
     if (percentage < 70) {
-      const remaining = MEI_LIMITS.alert70 - accumulated;
+      const remaining = 56700 - accumulated; // 70% limit
       return `Faltam ${formatCurrency(remaining)} para a zona de atenção (70%)`;
     } else if (percentage < 90) {
-      const remaining = MEI_LIMITS.alert90 - accumulated;
+      const remaining = 72900 - accumulated; // 90% limit
       return `Faltam ${formatCurrency(remaining)} para a zona urgente (90%)`;
     } else if (percentage < 100) {
       const remaining = MEI_LIMITS.annual - accumulated;
@@ -181,7 +142,7 @@ export function MEILimitAlert() {
     }).format(value);
   };
 
-  // Get projection alert message
+  // Get projection alert message (using server projection percentage)
   const getProjectionAlert = () => {
     if (projectionPercentage > 120) {
       return {
@@ -314,7 +275,7 @@ export function MEILimitAlert() {
         {/* Status */}
         <div className="space-y-2">
           <p className={`text-sm sm:text-base font-medium ${zoneInfo.textColor}`}>
-            {zoneInfo.status}
+            {status}
           </p>
           {getRemainingInfo() && (
             <p className="text-xs sm:text-sm text-muted-foreground">

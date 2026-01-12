@@ -13,6 +13,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
+interface MEILimitData {
+  year: number;
+  accumulated_income: number;
+  percentage: number;
+  zone: 'safe' | 'attention' | 'urgent' | 'exceeded' | 'critical';
+  status: string;
+  projection: number;
+  projection_percentage: number;
+  problematic_categories: string[];
+}
+
 interface FinanceContextType {
   clients: Client[];
   incomes: Income[];
@@ -22,6 +33,7 @@ interface FinanceContextType {
   filteredExpenses: Expense[];
   filteredInvestments: Investment[];
   selectedMonth: Date;
+  meiLimits: MEILimitData | null; // Exposed MEI Limits data
   setSelectedMonth: (date: Date) => void;
   addClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<void>;
   removeClient: (id: string) => Promise<void>;
@@ -58,8 +70,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const incomes = (queries.incomes.data as Income[] | undefined) || [];
   const expenses = (queries.expenses.data as Expense[] | undefined) || [];
   const investments = (queries.investments.data as Investment[] | undefined) || [];
+  const meiLimits = (queries.meiLimits.data as MEILimitData | null | undefined) || null;
   
-  const isLoading = queries.clients.isLoading || queries.incomes.isLoading || queries.expenses.isLoading || queries.investments.isLoading;
+  const isLoading = queries.clients.isLoading || queries.incomes.isLoading || queries.expenses.isLoading || queries.investments.isLoading || queries.meiLimits.isLoading;
 
   // Helper to invalidate all relevant queries
   const invalidateFinanceQueries = useCallback(() => {
@@ -172,6 +185,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .from('incomes')
         .insert([{
           ...income,
+          user_id: user.id, // CRITICAL FIX: Add user_id for RLS enforcement
           payment_date: income.paymentDate.toISOString(),
           client_id: income.clientId, // ID do cliente
         }]);
@@ -232,6 +246,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         .from('expenses')
         .insert([{
           ...expense,
+          user_id: user.id, // CRITICAL FIX: Add user_id for RLS enforcement
           due_date: expense.dueDate.toISOString(),
           payment_source_id: finalPaymentSourceId,
           is_fixed: expense.isFixed,
@@ -424,6 +439,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       filteredInvestments,
       selectedMonth,
       setSelectedMonth,
+      meiLimits, // Expose meiLimits
       addClient,
       removeClient,
       addIncome,
