@@ -45,21 +45,22 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isMutating, setIsMutating] = useState(false);
-  const {
-    clients,
-    incomes,
-    expenses,
-    investments,
-    financialSummary,
-    evolutionData,
-    expenseCategories,
-    clientAllocation,
-    meiLimits,
-    isLoading,
-  } = useFinanceData();
+  
+  // Destructure query results
+  const queries = useFinanceData();
+
+  // Extract data and calculate combined loading state (Fix 3, 8, 9, 10, 11)
+  const clients = (queries.clients.data as Client[] | undefined) || [];
+  const incomes = (queries.incomes.data as Income[] | undefined) || [];
+  const expenses = (queries.expenses.data as Expense[] | undefined) || [];
+  const investments = (queries.investments.data as Investment[] | undefined) || [];
+  
+  const isLoading = queries.clients.isLoading || queries.incomes.isLoading || queries.expenses.isLoading || queries.investments.isLoading;
+
 
   // Filtered data by selected month (including fixed expenses projected to current month)
   const filteredIncomes = useMemo(() => {
+    // Fix 4: using 'incomes' array
     return incomes.filter(income => {
       const incomeDate = new Date(income.paymentDate);
       const start = startOfMonth(selectedMonth);
@@ -72,6 +73,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const targetMonth = getMonth(selectedMonth);
     const targetYear = getYear(selectedMonth);
     
+    // Fix 5: using 'expenses' array
     return expenses.filter(expense => {
       const expenseDate = new Date(expense.dueDate);
       
@@ -107,6 +109,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [expenses, selectedMonth]);
 
   const filteredInvestments = useMemo(() => {
+    // Fix 6: using 'investments' array
     return investments.filter(investment => {
       const investmentDate = new Date(investment.date);
       const start = startOfMonth(selectedMonth);
@@ -266,6 +269,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getClientById = useCallback((id: string) => {
+    // Fix 7: using 'clients' array
     return clients.find(c => c.id === id);
   }, [clients]);
 
@@ -341,10 +345,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <FinanceContext.Provider value={{
-      clients: clients || [],
-      incomes: incomes || [],
-      expenses: expenses || [],
-      investments: investments || [],
+      clients,
+      incomes,
+      expenses,
+      investments,
       filteredIncomes,
       filteredExpenses,
       filteredInvestments,
