@@ -24,14 +24,14 @@ export function ClientExpenseAllocation() {
         .filter(inc => inc.clientId === client.id)
         .reduce((sum, inc) => sum + inc.amount, 0);
 
-      // Total expenses allocated to this client (paid)
+      // Total expenses allocated to this client (paid) - excluding "Saque" category
       const paidExpenses = filteredExpenses
-        .filter(exp => exp.paymentSourceId === client.id && exp.status === 'paid')
+        .filter(exp => exp.paymentSourceId === client.id && exp.status === 'paid' && exp.category !== 'Saque')
         .reduce((sum, exp) => sum + exp.amount, 0);
 
-      // Total expenses allocated to this client (unpaid/saved)
+      // Total expenses allocated to this client (unpaid/saved) - excluding "Saque" category
       const plannedExpenses = filteredExpenses
-        .filter(exp => exp.paymentSourceId === client.id && (exp.status === 'unpaid' || exp.status === 'saved'))
+        .filter(exp => exp.paymentSourceId === client.id && (exp.status === 'unpaid' || exp.status === 'saved') && exp.category !== 'Saque')
         .reduce((sum, exp) => sum + exp.amount, 0);
 
       const totalAllocated = paidExpenses + plannedExpenses;

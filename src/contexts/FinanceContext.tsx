@@ -105,11 +105,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [clients]);
 
   const calculateSummary = useCallback((type?: 'business' | 'personal'): FinancialSummary => {
+    const today = new Date();
     const typeFilteredExpenses = type 
       ? filteredExpenses.filter(e => e.type === type)
       : filteredExpenses;
 
-    const totalIncome = type === 'personal' ? 0 : filteredIncomes.reduce((sum, i) => sum + i.amount, 0);
+    // Total recebido: apenas receitas com data de pagamento <= hoje
+    const totalIncome = type === 'personal' ? 0 : filteredIncomes
+      .filter(i => new Date(i.paymentDate) <= today)
+      .reduce((sum, i) => sum + i.amount, 0);
     const totalExpenses = typeFilteredExpenses.reduce((sum, e) => sum + e.amount, 0);
     const totalInvestments = type === 'personal' ? 0 : filteredInvestments.reduce((sum, i) => sum + i.amount, 0);
     
