@@ -3,7 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { ExpenseForm } from "@/components/forms/ExpenseForm";
 import { MonthSelector } from "@/components/MonthSelector";
-import { TrendingUp, TrendingDown, PiggyBank, Wallet, Tag, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, PiggyBank, Wallet, Tag, Calendar, ArrowRightLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,7 +26,9 @@ export default function BusinessPage() {
   } = useFinance();
   
   const summary = getBusinessSummary();
-  const businessExpenses = filteredExpenses.filter(e => e.type === 'business');
+  const businessExpenses = filteredExpenses.filter(e => e.type === 'business' && e.category !== 'Saque');
+  const withdrawals = filteredExpenses.filter(e => e.type === 'business' && e.category === 'Saque');
+  const totalWithdrawals = withdrawals.reduce((sum, w) => sum + w.amount, 0);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -50,7 +52,7 @@ export default function BusinessPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatCard
           title="Receita Total"
           value={summary.totalIncome}
@@ -62,6 +64,12 @@ export default function BusinessPage() {
           value={summary.totalExpenses}
           icon={TrendingDown}
           variant="expense"
+        />
+        <StatCard
+          title="Saques"
+          value={totalWithdrawals}
+          icon={ArrowRightLeft}
+          variant="balance"
         />
         <StatCard
           title="Investimentos"
@@ -85,6 +93,11 @@ export default function BusinessPage() {
             <span className="sm:hidden">Desp.</span>
             <span className="ml-1">({businessExpenses.length})</span>
           </TabsTrigger>
+          <TabsTrigger value="withdrawals" className="text-xs sm:text-sm">
+            <span className="hidden sm:inline">Saques</span>
+            <span className="sm:hidden">Saq.</span>
+            <span className="ml-1">({withdrawals.length})</span>
+          </TabsTrigger>
           <TabsTrigger value="income" className="text-xs sm:text-sm">
             <span className="hidden sm:inline">Recebimentos</span>
             <span className="sm:hidden">Receb.</span>
@@ -104,6 +117,25 @@ export default function BusinessPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
               <ExpenseTable expenses={businessExpenses} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="withdrawals" className="mt-4">
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5 text-primary" />
+                  Saques (Pro-labore)
+                </CardTitle>
+                <span className="text-lg font-bold text-primary">
+                  {formatCurrency(totalWithdrawals)}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <ExpenseTable expenses={withdrawals} />
             </CardContent>
           </Card>
         </TabsContent>
