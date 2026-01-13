@@ -5,6 +5,14 @@ import { ExpenseForm } from "@/components/forms/ExpenseForm";
 import { MonthSelector } from "@/components/MonthSelector";
 import { TrendingDown, CheckCircle, Clock, Save, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMemo } from "react";
+
+const statusLabels: Record<string, string> = {
+  paid: "Pago",
+  unpaid: "A Pagar",
+  saved: "Guardado"
+};
 
 export default function PersonalPage() {
   const { 
@@ -18,6 +26,20 @@ export default function PersonalPage() {
   const totalSummary = getTotalSummary();
   const summary = getPersonalSummary();
   const personalExpenses = filteredExpenses.filter(e => e.type === 'personal');
+
+  // Group expenses by status
+  const expensesByStatus = useMemo(() => {
+    const grouped: Record<string, typeof personalExpenses> = {};
+    Object.keys(statusLabels).forEach(status => {
+      const statusExpenses = personalExpenses.filter(e => e.status === status);
+      if (statusExpenses.length > 0) {
+        grouped[status] = statusExpenses;
+      }
+    });
+    return grouped;
+  }, [personalExpenses]);
+
+  const statusesWithExpenses = Object.keys(expensesByStatus);
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in overflow-x-hidden">
@@ -79,15 +101,59 @@ export default function PersonalPage() {
         />
       </div>
 
-      {/* Expenses Table */}
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg">Despesas Pessoais</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-          <ExpenseTable expenses={personalExpenses} />
-        </CardContent>
-      </Card>
+      {/* Expenses by Status Tabs */}
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="all" className="flex-shrink-0">
+            <span>Todas</span>
+            <span className="ml-1 text-xs opacity-70">({personalExpenses.length})</span>
+          </TabsTrigger>
+          {statusesWithExpenses.map(status => (
+            <TabsTrigger key={status} value={status} className="flex-shrink-0">
+              <span className="text-xs sm:text-sm">{statusLabels[status]}</span>
+              <span className="ml-1 text-xs opacity-70">({expensesByStatus[status].length})</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="all">
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg flex items-center justify-between">
+                <span>Todas as Despesas</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    personalExpenses.reduce((sum, e) => sum + e.amount, 0)
+                  )}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <ExpenseTable expenses={personalExpenses} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {statusesWithExpenses.map(status => (
+          <TabsContent key={status} value={status}>
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg flex items-center justify-between">
+                  <span>{statusLabels[status]}</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                      expensesByStatus[status].reduce((sum, e) => sum + e.amount, 0)
+                    )}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <ExpenseTable expenses={expensesByStatus[status]} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 }
