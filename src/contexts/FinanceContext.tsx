@@ -142,9 +142,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       .filter(e => e.type === 'business' && e.category === 'Saque' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Despesas empresariais SEM contar os saques
+    // Despesas empresariais PAGAS SEM contar os saques
     const businessExpensesWithoutWithdrawals = filteredExpenses
-      .filter(e => e.type === 'business' && e.category !== 'Saque')
+      .filter(e => e.type === 'business' && e.category !== 'Saque' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
     
     // Despesas pessoais pagas
