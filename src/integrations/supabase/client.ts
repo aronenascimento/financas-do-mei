@@ -1,11 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vtegpmfvgbarjcvmrltd.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0ZWdwbWZ2Z2Jhcmpjdm1ybHRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjQ0OTIsImV4cCI6MjA4MzgwMDQ5Mn0.9grMPmPHqL6UN_ZDMX9cwVf1p_x8zOEeabWhTE15bf8'
+const SUPABASE_URL = 'https://ajoqivzatmjwuymsxzqz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqb3FpdnphdG1qd3V5bXN4enF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDY3NDMsImV4cCI6MjA4MzgyMjc0M30.P4GNdGYpwXpfBmB3gAnzNdxmqLzbtYPfpc9gdm1JRpw';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
+    storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
   },
-})
+});

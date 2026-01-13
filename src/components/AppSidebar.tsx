@@ -8,13 +8,11 @@ import {
   PiggyBank,
   FileSpreadsheet,
   Menu,
-  X,
-  LogOut
+  X
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { LogoutButton } from "./LogoutButton";
 
 const menuItems = [
   { 
@@ -173,10 +171,9 @@ export function AppSidebar() {
         {/* Footer */}
         <div className="p-4 border-t border-sidebar-border">
           <div className="bg-sidebar-accent/50 rounded-lg p-3">
-            <p className="text-xs text-sidebar-muted mb-2">
+            <p className="text-xs text-sidebar-muted">
               Sistema de gestão financeira pessoal para MEI
             </p>
-            <LogoutButton className="w-full justify-start" />
           </div>
         </div>
       </aside>

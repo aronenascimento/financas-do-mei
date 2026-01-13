@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useFinance } from "@/contexts/FinanceContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -24,8 +24,17 @@ import { Button } from "@/components/ui/button";
 
 const MEI_LIMITS = {
   annual: 81000,
+  alert70: 56700,
+  alert90: 72900,
   tolerance: 97200,
+  monthlyAverage: 6750
 };
+
+const PROBLEMATIC_CATEGORIES = [
+  "Importação",
+  "Revenda de produtos não permitidos",
+  "Serviços financeiros"
+];
 
 const CURRENT_YEAR = 2026;
 const STORAGE_KEY = `mei_alerts_shown_${CURRENT_YEAR}`;
@@ -56,84 +65,110 @@ const setAlertShown = (alertKey: keyof AlertsShown) => {
 };
 
 export function MEILimitAlert() {
-  const { meiLimits, isLoading } = useFinance();
-  const [alertsShown, setAlertsShown] = useState<AlertsShown>(getAlertsShown());
+  const { incomes } = useFinance();
+  const [alertsShown, setAlertsShown] = useState<AlertsShown>(getAlertsShown);
 
-  if (isLoading || !meiLimits) {
-    return null;
-  }
+  // Calculate accumulated revenue for the current year
+  const yearlyData = useMemo(() => {
+    const today = new Date();
+    const startOfYear = new Date(CURRENT_YEAR, 0, 1);
+    
+    // Filter incomes from Jan 1 to today
+    const yearIncomes = incomes.filter(income => {
+      const incomeDate = new Date(income.paymentDate);
+      return incomeDate >= startOfYear && incomeDate <= today;
+    });
 
-  // CORREÇÃO: Valores padrão para evitar crash com null/undefined
-  const { 
-    accumulated_income: accumulated = 0, 
-    projection = 0, 
-    percentage = 0, 
-    projection_percentage: projectionPercentage = 0, 
-    problematic_categories: problematicCategories = [],
-    zone = 'safe',
-    status = ''
-  } = meiLimits;
+    const accumulated = yearIncomes.reduce((sum, income) => sum + income.amount, 0);
+    const currentMonth = today.getMonth() + 1; // 1-12
+    const projection = currentMonth > 0 ? (accumulated / currentMonth) * 12 : 0;
+    const percentage = (accumulated / MEI_LIMITS.annual) * 100;
+    const projectionPercentage = (projection / MEI_LIMITS.annual) * 100;
 
-  // Garante que são números (caso venha string do banco)
-  const safePercentage = Number(percentage) || 0;
-  const safeProjectionPercentage = Number(projectionPercentage) || 0;
-  const safeAccumulated = Number(accumulated) || 0;
-  const safeProjection = Number(projection) || 0;
+    // Check for problematic categories
+    const problematicIncomes = yearIncomes.filter(income => 
+      PROBLEMATIC_CATEGORIES.includes(income.category)
+    );
+    const problematicCategories = [...new Set(problematicIncomes.map(i => i.category))];
 
+    return {
+      accumulated,
+      projection,
+      percentage,
+      projectionPercentage,
+      currentMonth,
+      problematicCategories,
+      yearIncomes
+    };
+  }, [incomes]);
+
+  const { accumulated, projection, percentage, projectionPercentage, problematicCategories } = yearlyData;
+
+  // Determine zone and colors
   const getZoneInfo = () => {
-    switch (zone) {
-      case 'critical':
-        return {
-          color: 'bg-red-800',
-          borderColor: 'border-red-800',
-          textColor: 'text-red-800',
-          icon: Ban
-        };
-      case 'exceeded':
-        return {
-          color: 'bg-red-500',
-          borderColor: 'border-red-500',
-          textColor: 'text-red-500',
-          icon: XCircle
-        };
-      case 'urgent':
-        return {
-          color: 'bg-orange-500',
-          borderColor: 'border-orange-500',
-          textColor: 'text-orange-500',
-          icon: AlertCircle
-        };
-      case 'attention':
-        return {
-          color: 'bg-yellow-500',
-          borderColor: 'border-yellow-500',
-          textColor: 'text-yellow-500',
-          icon: AlertTriangle
-        };
-      default:
-        return {
-          color: 'bg-green-500',
-          borderColor: 'border-green-500/30',
-          textColor: 'text-green-600',
-          icon: Target
-        };
+    if (percentage >= 120) {
+      return {
+        zone: 'critical',
+        color: 'bg-red-800',
+        borderColor: 'border-red-800',
+        textColor: 'text-red-800',
+        status: '🚫 CRÍTICO: Você ultrapassou a margem de tolerância',
+        icon: Ban
+      };
+    } else if (percentage >= 100) {
+      return {
+        zone: 'exceeded',
+        color: 'bg-red-500',
+        borderColor: 'border-red-500',
+        textColor: 'text-red-500',
+        status: '❌ Limite ultrapassado! Você tem até R$ 97.200 antes de penalidades',
+        icon: XCircle
+      };
+    } else if (percentage >= 90) {
+      return {
+        zone: 'urgent',
+        color: 'bg-orange-500',
+        borderColor: 'border-orange-500',
+        textColor: 'text-orange-500',
+        status: '🚨 Urgente: você já utilizou 90% do limite anual',
+        icon: AlertCircle
+      };
+    } else if (percentage >= 70) {
+      return {
+        zone: 'attention',
+        color: 'bg-yellow-500',
+        borderColor: 'border-yellow-500',
+        textColor: 'text-yellow-500',
+        status: '⚠️ Atenção: você já utilizou 70% do limite anual',
+        icon: AlertTriangle
+      };
+    } else {
+      return {
+        zone: 'safe',
+        color: 'bg-green-500',
+        borderColor: 'border-green-500/30',
+        textColor: 'text-green-600',
+        status: '✅ Você está na zona segura',
+        icon: Target
+      };
     }
   };
 
   const zoneInfo = getZoneInfo();
 
+  // Calculate remaining amount to next threshold
   const getRemainingInfo = () => {
-    if (safePercentage < 70) {
-      const remaining = 56700 - safeAccumulated;
+    if (percentage < 70) {
+      const remaining = MEI_LIMITS.alert70 - accumulated;
       return `Faltam ${formatCurrency(remaining)} para a zona de atenção (70%)`;
-    } else if (safePercentage < 90) {
-      const remaining = 72900 - safeAccumulated;
+    } else if (percentage < 90) {
+      const remaining = MEI_LIMITS.alert90 - accumulated;
       return `Faltam ${formatCurrency(remaining)} para a zona urgente (90%)`;
-    } else if (safePercentage < 100) {
-      const remaining = MEI_LIMITS.annual - safeAccumulated;
+    } else if (percentage < 100) {
+      const remaining = MEI_LIMITS.annual - accumulated;
       return `Faltam ${formatCurrency(remaining)} para o limite MEI (100%)`;
-    } else if (safePercentage < 120) {
-      const remaining = MEI_LIMITS.tolerance - safeAccumulated;
+    } else if (percentage < 120) {
+      const remaining = MEI_LIMITS.tolerance - accumulated;
       return `Faltam ${formatCurrency(remaining)} para a margem de tolerância (120%)`;
     }
     return null;
@@ -146,13 +181,14 @@ export function MEILimitAlert() {
     }).format(value);
   };
 
+  // Get projection alert message
   const getProjectionAlert = () => {
-    if (safeProjectionPercentage > 120) {
+    if (projectionPercentage > 120) {
       return {
         message: '🚨 Sua projeção indica que você ultrapassará até a margem de tolerância!',
         type: 'critical'
       };
-    } else if (safeProjectionPercentage > 100) {
+    } else if (projectionPercentage > 100) {
       return {
         message: '⚠️ Sua projeção indica que você ultrapassará o limite MEI. Considere revisar suas receitas ou migrar para ME.',
         type: 'warning'
@@ -163,6 +199,7 @@ export function MEILimitAlert() {
 
   const projectionAlert = getProjectionAlert();
 
+  // Handle toast notifications
   useEffect(() => {
     const showToastIfNeeded = (
       threshold: number, 
@@ -171,7 +208,7 @@ export function MEILimitAlert() {
       icon: React.ReactNode,
       type: 'warning' | 'error' | 'info'
     ) => {
-      if (safePercentage >= threshold && !alertsShown[alertKey]) {
+      if (percentage >= threshold && !alertsShown[alertKey]) {
         if (type === 'error') {
           toast.error(message, { icon, duration: 8000 });
         } else if (type === 'warning') {
@@ -184,46 +221,48 @@ export function MEILimitAlert() {
       }
     };
 
-    if (safePercentage >= 120) {
+    // Check thresholds in order (from lowest to highest)
+    if (percentage >= 120) {
       showToastIfNeeded(120, 'alert120', 
         'CRÍTICO: Margem de tolerância ultrapassada! Entre em contato com contador',
         <Ban className="w-4 h-4" />,
         'error'
       );
-    } else if (safePercentage >= 100) {
+    } else if (percentage >= 100) {
       showToastIfNeeded(100, 'alert100',
         'Limite MEI ultrapassado! Você tem até R$ 97.200 antes de penalidades',
         <XCircle className="w-4 h-4" />,
         'error'
       );
-    } else if (safePercentage >= 90) {
+    } else if (percentage >= 90) {
       showToastIfNeeded(90, 'alert90',
         'Urgente: Você atingiu 90% do limite MEI anual',
         <AlertCircle className="w-4 h-4" />,
         'warning'
       );
-    } else if (safePercentage >= 70) {
+    } else if (percentage >= 70) {
       showToastIfNeeded(70, 'alert70',
         'Atenção: Você atingiu 70% do limite MEI anual',
         <AlertTriangle className="w-4 h-4" />,
         'warning'
       );
     }
-  }, [safePercentage, alertsShown]);
+  }, [percentage, alertsShown]);
 
+  // Progress bar color based on percentage
   const getProgressColor = () => {
-    if (safePercentage >= 120) return '#dc2626';
-    if (safePercentage >= 100) return '#ef4444';
-    if (safePercentage >= 90) return '#f97316';
-    if (safePercentage >= 70) return '#eab308';
-    return '#22c55e';
+    if (percentage >= 120) return '#dc2626'; // red-600
+    if (percentage >= 100) return '#ef4444'; // red-500
+    if (percentage >= 90) return '#f97316';  // orange-500
+    if (percentage >= 70) return '#eab308';  // yellow-500
+    return '#22c55e'; // green-500
   };
 
-  const progressValue = Math.min(safePercentage, 120);
+  const progressValue = Math.min(percentage, 120);
 
   return (
     <Card className={`col-span-full transition-all duration-300 ${
-      safePercentage >= 70 
+      percentage >= 70 
         ? `border-2 ${zoneInfo.borderColor} shadow-lg` 
         : 'border'
     }`}>
@@ -234,16 +273,18 @@ export function MEILimitAlert() {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0 space-y-4">
+        {/* Main Info */}
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
             <p className="text-sm sm:text-base text-muted-foreground">
               <span className="font-semibold text-foreground">
-                {formatCurrency(safeAccumulated)}
+                {formatCurrency(accumulated)}
               </span>
-              {' '}de {formatCurrency(MEI_LIMITS.annual)} ({safePercentage.toFixed(1)}%)
+              {' '}de {formatCurrency(MEI_LIMITS.annual)} ({percentage.toFixed(1)}%)
             </p>
           </div>
 
+          {/* Progress Bar */}
           <div className="relative">
             <Progress 
               value={progressValue} 
@@ -252,6 +293,7 @@ export function MEILimitAlert() {
                 '--progress-color': getProgressColor()
               } as React.CSSProperties}
             />
+            {/* Zone markers */}
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
               <div className="absolute top-0 h-full border-l-2 border-yellow-500/50" style={{ left: '70%' }} />
               <div className="absolute top-0 h-full border-l-2 border-orange-500/50" style={{ left: '90%' }} />
@@ -259,6 +301,7 @@ export function MEILimitAlert() {
             </div>
           </div>
 
+          {/* Zone labels for desktop */}
           <div className="hidden sm:flex justify-between text-[10px] text-muted-foreground px-1">
             <span>0%</span>
             <span className="text-yellow-600">70%</span>
@@ -268,9 +311,10 @@ export function MEILimitAlert() {
           </div>
         </div>
 
+        {/* Status */}
         <div className="space-y-2">
           <p className={`text-sm sm:text-base font-medium ${zoneInfo.textColor}`}>
-            {status}
+            {zoneInfo.status}
           </p>
           {getRemainingInfo() && (
             <p className="text-xs sm:text-sm text-muted-foreground">
@@ -279,6 +323,7 @@ export function MEILimitAlert() {
           )}
         </div>
 
+        {/* Projection Card */}
         <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
           <div className="flex items-center gap-2 text-sm sm:text-base font-medium">
             <TrendingUp className="w-4 h-4 text-primary" />
@@ -286,10 +331,10 @@ export function MEILimitAlert() {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
             <p className="text-lg sm:text-xl font-bold text-foreground">
-              {formatCurrency(safeProjection)}
+              {formatCurrency(projection)}
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              ({safeProjectionPercentage.toFixed(1)}% do limite)
+              ({projectionPercentage.toFixed(1)}% do limite)
             </p>
           </div>
           {projectionAlert && (
@@ -301,7 +346,8 @@ export function MEILimitAlert() {
           )}
         </div>
 
-        {problematicCategories && problematicCategories.length > 0 && (
+        {/* Problematic Categories Alert */}
+        {problematicCategories.length > 0 && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 sm:p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
               <AlertTriangle className="w-4 h-4" />
@@ -331,8 +377,26 @@ export function MEILimitAlert() {
                   <DialogDescription asChild>
                     <div className="space-y-4 pt-4">
                       <p>
-                        O MEI (Microempreendedor Individual) possui restrições quanto às atividades permitidas.
+                        O MEI (Microempreendedor Individual) possui restrições quanto às atividades permitidas. 
+                        Algumas categorias de receita podem não ser compatíveis com este regime tributário.
                       </p>
+                      <div>
+                        <h4 className="font-semibold mb-2">Categorias detectadas:</h4>
+                        <ul className="list-disc list-inside text-muted-foreground">
+                          {problematicCategories.map(category => (
+                            <li key={category}>{category}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-2">O que fazer?</h4>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                          <li>Verifique se a categoria está correta no cadastro</li>
+                          <li>Consulte a lista oficial de atividades permitidas para MEI</li>
+                          <li>Se necessário, considere migrar para ME ou outro regime</li>
+                          <li>Consulte um contador para orientação específica</li>
+                        </ul>
+                      </div>
                     </div>
                   </DialogDescription>
                 </DialogHeader>

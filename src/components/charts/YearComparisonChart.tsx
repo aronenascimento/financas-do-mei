@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { format, startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, isValid } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface MonthData {
@@ -37,28 +37,24 @@ export function YearComparisonChart() {
       const currentStart = startOfMonth(currentYearDate);
       const currentEnd = endOfMonth(currentYearDate);
 
-      const currentIncomes = incomes.filter((income) => {
-        const date = new Date(income.paymentDate);
-        return isValid(date) && isWithinInterval(date, { start: currentStart, end: currentEnd });
-      });
-      const currentExpenses = expenses.filter((expense) => {
-        const date = new Date(expense.dueDate);
-        return isValid(date) && isWithinInterval(date, { start: currentStart, end: currentEnd });
-      });
+      const currentIncomes = incomes.filter((income) =>
+        isWithinInterval(new Date(income.paymentDate), { start: currentStart, end: currentEnd })
+      );
+      const currentExpenses = expenses.filter((expense) =>
+        isWithinInterval(new Date(expense.dueDate), { start: currentStart, end: currentEnd })
+      );
 
       // Calculate for previous year (2025)
       const previousYearDate = setYear(setMonth(new Date(), monthIndex), previousYear);
       const previousStart = startOfMonth(previousYearDate);
       const previousEnd = endOfMonth(previousYearDate);
 
-      const previousIncomes = incomes.filter((income) => {
-        const date = new Date(income.paymentDate);
-        return isValid(date) && isWithinInterval(date, { start: previousStart, end: previousEnd });
-      });
-      const previousExpenses = expenses.filter((expense) => {
-        const date = new Date(expense.dueDate);
-        return isValid(date) && isWithinInterval(date, { start: previousStart, end: previousEnd });
-      });
+      const previousIncomes = incomes.filter((income) =>
+        isWithinInterval(new Date(income.paymentDate), { start: previousStart, end: previousEnd })
+      );
+      const previousExpenses = expenses.filter((expense) =>
+        isWithinInterval(new Date(expense.dueDate), { start: previousStart, end: previousEnd })
+      );
 
       data.push({
         month: monthName,

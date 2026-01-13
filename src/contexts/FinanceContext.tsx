@@ -1,19 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { useFinanceData } from '@/hooks/useFinanceData';
-import { 
-  Client, 
-  Income, 
-  Expense, 
-  Investment, 
-  FinancialSummary, 
-  PaymentStatus,
-  MEILimitData 
-} from '@/types/finance';
-import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear, isValid } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
-
+import { Client, Income, Expense, Investment, FinancialSummary, PaymentStatus } from '@/types/finance';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear } from 'date-fns';
 
 interface FinanceContextType {
   clients: Client[];
@@ -24,68 +12,59 @@ interface FinanceContextType {
   filteredExpenses: Expense[];
   filteredInvestments: Investment[];
   selectedMonth: Date;
-  meiLimits: MEILimitData | null;
+  loading: boolean;
   setSelectedMonth: (date: Date) => void;
-  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<void>;
-  removeClient: (id: string) => Promise<void>;
-  addIncome: (income: Omit<Income, 'id' | 'createdAt'>) => Promise<void>;
-  updateIncome: (id: string, income: Partial<Omit<Income, 'id' | 'createdAt'>>) => Promise<void>;
-  removeIncome: (id: string) => Promise<void>;
-  addExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'> & { paymentSourceId?: string | null }) => Promise<void>;
-  updateExpense: (id: string, expense: Partial<Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'>> & { paymentSourceId?: string | null }) => Promise<void>;
-  updateExpenseStatus: (id: string, status: PaymentStatus, paymentSourceId?: string | null) => Promise<void>;
-  removeExpense: (id: string) => Promise<void>;
-  addInvestment: (investment: Omit<Investment, 'id' | 'createdAt'>) => Promise<void>;
-  removeInvestment: (id: string) => Promise<void>;
+  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => void;
+  removeClient: (id: string) => void;
+  addIncome: (income: Omit<Income, 'id' | 'createdAt'>) => void;
+  updateIncome: (id: string, income: Partial<Omit<Income, 'id' | 'createdAt'>>) => void;
+  removeIncome: (id: string) => void;
+  addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => void;
+  updateExpense: (id: string, expense: Partial<Omit<Expense, 'id' | 'createdAt'>>) => void;
+  updateExpenseStatus: (id: string, status: PaymentStatus, paymentSourceId?: string) => void;
+  removeExpense: (id: string) => void;
+  addInvestment: (investment: Omit<Investment, 'id' | 'createdAt'>) => void;
+  removeInvestment: (id: string) => void;
   getBusinessSummary: () => FinancialSummary;
   getPersonalSummary: () => FinancialSummary;
   getTotalSummary: () => FinancialSummary;
   getClientById: (id: string) => Client | undefined;
-  isLoading: boolean;
-  isMutating: boolean;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
+// Helper function to check if a date is within a month
+const isInMonth = (date: Date, monthDate: Date): boolean => {
+  const start = startOfMonth(monthDate);
+  const end = endOfMonth(monthDate);
+  return isWithinInterval(new Date(date), { start, end });
+};
+
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [isMutating, setIsMutating] = useState(false);
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  const queries = useFinanceData();
-
-  const clients = (queries.clients.data as Client[] | undefined) || [];
-  const incomes = (queries.incomes.data as Income[] | undefined) || [];
-  const expenses = (queries.expenses.data as Expense[] | undefined) || [];
-  const investments = (queries.investments.data as Investment[] | undefined) || [];
-  const meiLimits = (queries.meiLimits.data as MEILimitData | null | undefined) || null;
   
-  const isLoading = queries.clients.isLoading || queries.incomes.isLoading || queries.expenses.isLoading || queries.investments.isLoading || queries.meiLimits.isLoading;
+  const {
+    clients,
+    incomes,
+    expenses,
+    investments,
+    loading,
+    addClient,
+    removeClient,
+    addIncome,
+    updateIncome,
+    removeIncome,
+    addExpense,
+    updateExpense,
+    updateExpenseStatus,
+    removeExpense,
+    addInvestment,
+    removeInvestment,
+  } = useSupabaseData();
 
-  const invalidateFinanceQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['clients'] });
-    queryClient.invalidateQueries({ queryKey: ['incomes'] });
-    queryClient.invalidateQueries({ queryKey: ['expenses'] });
-    queryClient.invalidateQueries({ queryKey: ['investments'] });
-    // financial-summary query was removed, updating dependencies
-    queryClient.invalidateQueries({ queryKey: ['evolution-data'] });
-    queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
-    queryClient.invalidateQueries({ queryKey: ['client-allocation'] });
-    queryClient.invalidateQueries({ queryKey: ['mei-limits'] });
-  }, [queryClient]);
-
-  // CORREÇÃO: Adicionar validação de datas para evitar RangeError
+  // Filtered data by selected month (including fixed expenses projected to current month)
   const filteredIncomes = useMemo(() => {
-    return incomes.filter(income => {
-      const incomeDate = new Date(income.paymentDate);
-      // Proteção contra data inválida
-      if (!isValid(incomeDate)) return false; 
-      
-      const start = startOfMonth(selectedMonth);
-      const end = endOfMonth(selectedMonth);
-      return isWithinInterval(incomeDate, { start, end });
-    });
+    return incomes.filter(income => isInMonth(income.paymentDate, selectedMonth));
   }, [incomes, selectedMonth]);
 
   const filteredExpenses = useMemo(() => {
@@ -93,34 +72,22 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const targetYear = getYear(selectedMonth);
     
     return expenses.filter(expense => {
-      const expenseDate = new Date(expense.dueDate);
-      
-      // CORREÇÃO: Proteção contra data inválida
-      if (!isValid(expenseDate)) return false;
-      
       // If it's in the selected month, show it
-      if (isWithinInterval(expenseDate, { 
-        start: startOfMonth(selectedMonth), 
-        end: endOfMonth(selectedMonth) 
-      })) {
+      if (isInMonth(expense.dueDate, selectedMonth)) {
         return true;
       }
-      
       // If it's a fixed expense and was created before or during the selected month, show it
       if (expense.isFixed) {
-        const createdDate = new Date(expense.createdAt);
-        const createdMonth = getMonth(createdDate);
-        const createdYear = getYear(createdDate);
-        return createdYear < targetYear || (createdYear === targetYear && createdMonth <= targetMonth);
+        const expenseDate = new Date(expense.dueDate);
+        const expenseMonth = getMonth(expenseDate);
+        const expenseYear = getYear(expenseDate);
+        // Show fixed expenses that were created in the same month of any year, or earlier
+        return expenseYear < targetYear || (expenseYear === targetYear && expenseMonth <= targetMonth);
       }
-      
       return false;
     }).map(expense => {
       // For fixed expenses, adjust the due date to the selected month
-      if (expense.isFixed && !isWithinInterval(new Date(expense.dueDate), { 
-        start: startOfMonth(selectedMonth), 
-        end: endOfMonth(selectedMonth) 
-      })) {
+      if (expense.isFixed && !isInMonth(expense.dueDate, selectedMonth)) {
         const originalDate = new Date(expense.dueDate);
         const adjustedDate = setYear(setMonth(originalDate, targetMonth), targetYear);
         return { ...expense, dueDate: adjustedDate };
@@ -130,219 +97,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [expenses, selectedMonth]);
 
   const filteredInvestments = useMemo(() => {
-    return investments.filter(investment => {
-      const investmentDate = new Date(investment.date);
-      // CORREÇÃO: Proteção contra data inválida
-      if (!isValid(investmentDate)) return false;
-      
-      const start = startOfMonth(selectedMonth);
-      const end = endOfMonth(selectedMonth);
-      return isWithinInterval(investmentDate, { start, end });
-    });
+    return investments.filter(investment => isInMonth(investment.date, selectedMonth));
   }, [investments, selectedMonth]);
-
-  const addClient = useCallback(async (client: Omit<Client, 'id' | 'createdAt'>) => {
-    if (!user) return;
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .insert([{ ...client, user_id: user.id }]);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries, user]);
-
-  const removeClient = useCallback(async (id: string) => {
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
-
-  const addIncome = useCallback(async (income: Omit<Income, 'id' | 'createdAt'>) => {
-    if (!user) return;
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('incomes')
-        .insert([{
-          ...income,
-          user_id: user.id,
-          payment_date: income.paymentDate.toISOString(),
-          client_id: income.clientId,
-        }]);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries, user]);
-
-  const updateIncome = useCallback(async (id: string, updates: Partial<Omit<Income, 'id' | 'createdAt'>>) => {
-    setIsMutating(true);
-    try {
-      const payload: Record<string, any> = { ...updates };
-      if (updates.paymentDate) {
-        payload.payment_date = updates.paymentDate.toISOString();
-      }
-      if (updates.clientId !== undefined) {
-        payload.client_id = updates.clientId;
-      }
-
-      const { error } = await supabase
-        .from('incomes')
-        .update(payload)
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
-
-  const removeIncome = useCallback(async (id: string) => {
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('incomes')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
-
-  const addExpense = useCallback(async (expense: Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'> & { paymentSourceId?: string | null }) => {
-    if (!user) return;
-    setIsMutating(true);
-    try {
-      const finalPaymentSourceId = expense.paymentSourceId || null;
-
-      const { error } = await supabase
-        .from('expenses')
-        .insert([{
-          ...expense,
-          user_id: user.id,
-          due_date: expense.dueDate.toISOString(),
-          payment_source_id: finalPaymentSourceId,
-          is_fixed: expense.isFixed,
-        }]);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries, user]);
-
-  const updateExpense = useCallback(async (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt' | 'paymentSourceId'>> & { paymentSourceId?: string | null }) => {
-    setIsMutating(true);
-    try {
-      const payload: Record<string, any> = { ...updates };
-      if (updates.dueDate) {
-        payload.due_date = updates.dueDate.toISOString();
-      }
-      if (updates.paymentSourceId !== undefined) {
-        payload.payment_source_id = updates.paymentSourceId || null;
-      }
-      if (updates.isFixed !== undefined) {
-        payload.is_fixed = updates.isFixed;
-      }
-
-      const { error } = await supabase
-        .from('expenses')
-        .update(payload)
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
-
-  const updateExpenseStatus = useCallback(async (id: string, status: PaymentStatus, paymentSourceId?: string | null) => {
-    setIsMutating(true);
-    try {
-      const finalPaymentSourceId = paymentSourceId || null;
-
-      const { error } = await supabase
-        .from('expenses')
-        .update({ status, payment_source_id: finalPaymentSourceId })
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
-
-  const removeExpense = useCallback(async (id: string) => {
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('expenses')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
-
-  const addInvestment = useCallback(async (investment: Omit<Investment, 'id' | 'createdAt'>) => {
-    if (!user) return;
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('investments')
-        .insert([{
-          ...investment,
-          user_id: user.id,
-          date: investment.date.toISOString(),
-        }]);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries, user]);
-
-  const removeInvestment = useCallback(async (id: string) => {
-    setIsMutating(true);
-    try {
-      const { error } = await supabase
-        .from('investments')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      invalidateFinanceQueries();
-    } finally {
-      setIsMutating(false);
-    }
-  }, [invalidateFinanceQueries]);
 
   const getClientById = useCallback((id: string) => {
     return clients.find(c => c.id === id);
@@ -369,6 +125,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       .filter(e => e.status === 'saved')
       .reduce((sum, e) => sum + e.amount, 0);
 
+    // Calculate expenses by payment source
     const expensesBySource: Record<string, number> = {};
     typeFilteredExpenses.forEach(e => {
       if (e.paymentSourceId) {
@@ -376,19 +133,25 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Saques são despesas empresariais com categoria "Saque"
     const totalWithdrawals = filteredExpenses
       .filter(e => e.type === 'business' && e.category === 'Saque' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
 
-    const business ExpensesWithoutWithdrawals = filteredExpenses
+    // Despesas empresariais SEM contar os saques
+    const businessExpensesWithoutWithdrawals = filteredExpenses
       .filter(e => e.type === 'business' && e.category !== 'Saque')
       .reduce((sum, e) => sum + e.amount, 0);
     
+    // Despesas pessoais pagas
     const personalPaidExpenses = filteredExpenses
       .filter(e => e.type === 'personal' && e.status === 'paid')
       .reduce((sum, e) => sum + e.amount, 0);
 
+    // Caixa empresa = Receita - Despesas empresa (incluindo saques) - Investimentos
     const businessBalance = totalIncome - businessExpensesWithoutWithdrawals - totalWithdrawals - totalInvestments;
+    
+    // Disponível pessoal = Saques - Despesas pessoais pagas
     const personalBalance = totalWithdrawals - personalPaidExpenses;
 
     return {
@@ -421,8 +184,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       filteredExpenses,
       filteredInvestments,
       selectedMonth,
+      loading,
       setSelectedMonth,
-      meiLimits,
       addClient,
       removeClient,
       addIncome,
@@ -438,8 +201,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       getPersonalSummary,
       getTotalSummary,
       getClientById,
-      isLoading,
-      isMutating,
     }}>
       {children}
     </FinanceContext.Provider>
