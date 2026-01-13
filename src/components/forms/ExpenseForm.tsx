@@ -28,6 +28,7 @@ const personalCategories = [
   "Saúde",
   "Lazer",
   "Educação",
+  "Cartão de crédito",
   "Poupança",
   "Outros"
 ];
