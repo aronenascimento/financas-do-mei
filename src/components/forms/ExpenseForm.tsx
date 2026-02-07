@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil } from "lucide-react";
 import { PaymentStatus, Expense } from "@/types/finance";
-import { format } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 
 const businessCategories = [
@@ -162,8 +162,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
 
       // Criar despesas para os próximos meses
       for (let i = 1; i <= months; i++) {
-        const nextMonth = new Date(parsedDate);
-        nextMonth.setMonth(nextMonth.getMonth() + i);
+        const nextMonth = addMonths(parsedDate, i);
         
         const nextExpense = {
           ...expenseData,
@@ -194,7 +193,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
       <DialogTrigger asChild>
         {editMode ? (
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-4 h-4" />
           </Button>
         ) : (
           <Button className="gap-2">

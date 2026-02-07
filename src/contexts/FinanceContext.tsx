@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Client, Income, Expense, Investment, FinancialSummary, PaymentStatus } from '@/types/finance';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
-import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear, addMonths } from 'date-fns';
 
 interface FinanceContextType {
   clients: Client[];
