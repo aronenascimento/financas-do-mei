@@ -69,6 +69,7 @@ export function useSupabaseData() {
       if (investmentsRes.data) setInvestments(investmentsRes.data.map(toInvestment));
     } catch (error) {
       console.error('Error fetching data:', error);
+      toast.error('Erro ao carregar dados do sistema');
     } finally {
       setLoading(false);
     }
@@ -93,7 +94,7 @@ export function useSupabaseData() {
     }
     if (data) {
       setClients(prev => [toClient(data), ...prev]);
-      toast.success('Cliente adicionado!');
+      toast.success('Cliente adicionado com sucesso!');
     }
   }, []);
 
@@ -105,7 +106,7 @@ export function useSupabaseData() {
       return;
     }
     setClients(prev => prev.filter(c => c.id !== id));
-    toast.success('Cliente removido!');
+    toast.success('Cliente removido com sucesso!');
   }, []);
 
   // INCOMES
@@ -129,7 +130,7 @@ export function useSupabaseData() {
     }
     if (data) {
       setIncomes(prev => [toIncome(data), ...prev]);
-      toast.success('Receita adicionada!');
+      toast.success('Receita adicionada com sucesso!');
     }
   }, []);
 
@@ -155,7 +156,7 @@ export function useSupabaseData() {
     }
     if (data) {
       setIncomes(prev => prev.map(i => i.id === id ? toIncome(data) : i));
-      toast.success('Receita atualizada!');
+      toast.success('Receita atualizada com sucesso!');
     }
   }, []);
 
@@ -167,7 +168,7 @@ export function useSupabaseData() {
       return;
     }
     setIncomes(prev => prev.filter(i => i.id !== id));
-    toast.success('Receita removida!');
+    toast.success('Receita removida com sucesso!');
   }, []);
 
   // EXPENSES
@@ -194,7 +195,7 @@ export function useSupabaseData() {
     }
     if (data) {
       setExpenses(prev => [toExpense(data), ...prev]);
-      toast.success('Despesa adicionada!');
+      toast.success('Despesa adicionada com sucesso!');
     }
   }, []);
 
@@ -223,7 +224,7 @@ export function useSupabaseData() {
     }
     if (data) {
       setExpenses(prev => prev.map(e => e.id === id ? toExpense(data) : e));
-      toast.success('Despesa atualizada!');
+      toast.success('Despesa atualizada com sucesso!');
     }
   }, []);
 
@@ -256,7 +257,7 @@ export function useSupabaseData() {
       return;
     }
     setExpenses(prev => prev.filter(e => e.id !== id));
-    toast.success('Despesa removida!');
+    toast.success('Despesa removida com sucesso!');
   }, []);
 
   // INVESTMENTS
@@ -279,7 +280,7 @@ export function useSupabaseData() {
     }
     if (data) {
       setInvestments(prev => [toInvestment(data), ...prev]);
-      toast.success('Investimento adicionado!');
+      toast.success('Investimento adicionado com sucesso!');
     }
   }, []);
 
@@ -291,7 +292,7 @@ export function useSupabaseData() {
       return;
     }
     setInvestments(prev => prev.filter(i => i.id !== id));
-    toast.success('Investimento removido!');
+    toast.success('Investimento removido com sucesso!');
   }, []);
 
   return {
