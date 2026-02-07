@@ -62,38 +62,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     removeInvestment,
   } = useSupabaseData();
 
-  // Filtered data by selected month (including fixed expenses projected to current month)
+  // Filtered data by selected month (no projection for fixed expenses)
   const filteredIncomes = useMemo(() => {
     return incomes.filter(income => isInMonth(income.paymentDate, selectedMonth));
   }, [incomes, selectedMonth]);
 
   const filteredExpenses = useMemo(() => {
-    const targetMonth = getMonth(selectedMonth);
-    const targetYear = getYear(selectedMonth);
-    
-    return expenses.filter(expense => {
-      // If it's in the selected month, show it
-      if (isInMonth(expense.dueDate, selectedMonth)) {
-        return true;
-      }
-      // If it's a fixed expense and was created before or during the selected month, show it
-      if (expense.isFixed) {
-        const expenseDate = new Date(expense.dueDate);
-        const expenseMonth = getMonth(expenseDate);
-        const expenseYear = getYear(expenseDate);
-        // Show fixed expenses that were created in the same month of any year, or earlier
-        return expenseYear < targetYear || (expenseYear === targetYear && expenseMonth <= targetMonth);
-      }
-      return false;
-    }).map(expense => {
-      // For fixed expenses, adjust the due date to the selected month
-      if (expense.isFixed && !isInMonth(expense.dueDate, selectedMonth)) {
-        const originalDate = new Date(expense.dueDate);
-        const adjustedDate = setYear(setMonth(originalDate, targetMonth), targetYear);
-        return { ...expense, dueDate: adjustedDate };
-      }
-      return expense;
-    });
+    return expenses.filter(expense => isInMonth(expense.dueDate, selectedMonth));
   }, [expenses, selectedMonth]);
 
   const filteredInvestments = useMemo(() => {

@@ -51,6 +51,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
   const [status, setStatus] = useState<PaymentStatus>("unpaid");
   const [paymentSourceId, setPaymentSourceId] = useState("");
   const [isFixed, setIsFixed] = useState(false);
+  const [months, setMonths] = useState<number>(0); // Novo campo para meses
 
   const categories = type === 'business' ? businessCategories : personalCategories;
 
@@ -97,6 +98,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
       setStatus(expense.status);
       setPaymentSourceId(expense.paymentSourceId || "");
       setIsFixed(expense.isFixed);
+      setMonths(0); // Reset months when editing
     }
   }, [expense, editMode]);
 
@@ -108,6 +110,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
     setStatus("unpaid");
     setPaymentSourceId("");
     setIsFixed(false);
+    setMonths(0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -149,10 +152,33 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
       isFixed,
     };
 
-    if (editMode && expense) {
-      updateExpense(expense.id, expenseData);
+    if (isFixed && months > 0) {
+      // Criar a despesa atual
+      if (editMode && expense) {
+        updateExpense(expense.id, expenseData);
+      } else {
+        addExpense(expenseData);
+      }
+
+      // Criar despesas para os próximos meses
+      for (let i = 1; i <= months; i++) {
+        const nextMonth = new Date(parsedDate);
+        nextMonth.setMonth(nextMonth.getMonth() + i);
+        
+        const nextExpense = {
+          ...expenseData,
+          dueDate: nextMonth,
+        };
+        
+        addExpense(nextExpense);
+      }
     } else {
-      addExpense(expenseData);
+      // Lógica normal
+      if (editMode && expense) {
+        updateExpense(expense.id, expenseData);
+      } else {
+        addExpense(expenseData);
+      }
     }
 
     resetForm();
@@ -287,6 +313,24 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
               Despesa fixa (repete todo mês)
             </Label>
           </div>
+
+          {isFixed && (
+            <div className="space-y-2 ml-6">
+              <Label htmlFor="months">Criar para os próximos meses</Label>
+              <Input
+                id="months"
+                type="number"
+                min="1"
+                max="12"
+                placeholder="1"
+                value={months || ""}
+                onChange={(e) => setMonths(e.target.value ? parseInt(e.target.value) : 0)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cria cópias desta despesa para os próximos N meses
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
