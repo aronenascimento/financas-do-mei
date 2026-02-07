@@ -161,7 +161,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
       }
 
       // Criar cópias para os próximos meses usando a função do contexto
-      createFixedExpenseCopies(expenseData, months);
+      createFixedExpenseCopies(expenseData as Omit<Expense, 'id' | 'createdAt'>, months);
       
       toast.success(`Despesa fixa criada para ${months} meses à frente!`);
     } else {
