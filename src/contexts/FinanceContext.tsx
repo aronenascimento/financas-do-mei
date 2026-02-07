@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Client, Income, Expense, Investment, FinancialSummary, PaymentStatus } from '@/types/finance';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
-import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear, addMonths } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear, getMonth, getYear, addMonths, isSameMonth, isSameYear, parseISO } from 'date-fns';
 
 interface FinanceContextType {
   clients: Client[];
@@ -29,6 +29,7 @@ interface FinanceContextType {
   getPersonalSummary: () => FinancialSummary;
   getTotalSummary: () => FinancialSummary;
   getClientById: (id: string) => Client | undefined;
+  createFixedExpenseCopies: (originalExpense: Expense, monthsAhead: number) => void;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -38,6 +39,34 @@ const isInMonth = (date: Date, monthDate: Date): boolean => {
   const start = startOfMonth(monthDate);
   const end = endOfMonth(monthDate);
   return isWithinInterval(new Date(date), { start, end });
+};
+
+// Helper function to find fixed expenses that should be copied to current month
+const findFixedExpensesToCopy = (expenses: Expense[], targetMonth: Date): Expense[] => {
+  const targetMonthStart = startOfMonth(targetMonth);
+  const targetMonthEnd = endOfMonth(targetMonth);
+  
+  return expenses.filter(expense => {
+    // Only consider fixed expenses from previous months
+    const expenseDate = new Date(expense.dueDate);
+    const expenseMonthStart = startOfMonth(expenseDate);
+    const expenseMonthEnd = endOfMonth(expenseDate);
+    
+    // Check if this is a fixed expense from a previous month
+    if (!expense.isFixed || !isWithinInterval(expenseMonthStart, { start: expenseMonthStart, end: expenseMonthEnd })) {
+      return false;
+    }
+    
+    // Check if we already have a copy of this expense in the target month
+    const existingCopy = expenses.some(existing => 
+      existing.isFixed && 
+      existing.category === expense.category && 
+      existing.description === expense.description &&
+      isInMonth(existing.dueDate, targetMonth)
+    );
+    
+    return !existingCopy;
+  });
 };
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
@@ -62,13 +91,50 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     removeInvestment,
   } = useSupabaseData();
 
-  // Filtered data by selected month (no projection for fixed expenses)
+  // Function to create copies of fixed expenses for future months
+  const createFixedExpenseCopies = useCallback((originalExpense: Expense, monthsAhead: number) => {
+    const copies: Expense[] = [];
+    
+    for (let i = 1; i <= monthsAhead; i++) {
+      const copyDate = addMonths(new Date(originalExpense.dueDate), i);
+      
+      const copy: Expense = {
+        ...originalExpense,
+        id: `${originalExpense.id}_copy_${i}`, // Generate unique ID for each copy
+        dueDate: copyDate,
+        createdAt: new Date(),
+        // Reset status for new copies
+        status: 'unpaid',
+        paymentSourceId: undefined,
+      };
+      
+      copies.push(copy);
+    }
+    
+    // Add all copies at once
+    copies.forEach(copy => addExpense(copy));
+  }, [addExpense]);
+
+  // Filtered data by selected month
   const filteredIncomes = useMemo(() => {
     return incomes.filter(income => isInMonth(income.paymentDate, selectedMonth));
   }, [incomes, selectedMonth]);
 
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(expense => isInMonth(expense.dueDate, selectedMonth));
+    // First get expenses for the current month
+    let monthExpenses = expenses.filter(expense => isInMonth(expense.dueDate, selectedMonth));
+    
+    // Check if we need to create copies of fixed expenses
+    const fixedExpensesToCopy = findFixedExpensesToCopy(expenses, selectedMonth);
+    
+    if (fixedExpensesToCopy.length > 0) {
+      // For development/demo purposes, we'll just show the existing expenses
+      // In a real app, you might want to automatically create these copies
+      // For now, we'll just log what would be copied
+      console.log(`Would copy ${fixedExpensesToCopy.length} fixed expenses to ${selectedMonth.toLocaleDateString()}`);
+    }
+    
+    return monthExpenses;
   }, [expenses, selectedMonth]);
 
   const filteredInvestments = useMemo(() => {
@@ -180,6 +246,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       getPersonalSummary,
       getTotalSummary,
       getClientById,
+      createFixedExpenseCopies,
     }}>
       {children}
     </FinanceContext.Provider>

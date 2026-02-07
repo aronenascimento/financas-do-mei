@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil } from "lucide-react";
 import { PaymentStatus, Expense } from "@/types/finance";
-import { format, addMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, isWithinInterval, isSameMonth, isSameYear } from "date-fns";
 import { toast } from "sonner";
 
 const businessCategories = [
@@ -42,7 +42,7 @@ interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode = false }: ExpenseFormProps) {
-  const { addExpense, updateExpense, clients, incomes, expenses } = useFinance();
+  const { addExpense, updateExpense, clients, incomes, expenses, createFixedExpenseCopies } = useFinance();
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -160,17 +160,10 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
         addExpense(expenseData);
       }
 
-      // Criar despesas para os próximos meses
-      for (let i = 1; i <= months; i++) {
-        const nextMonth = addMonths(parsedDate, i);
-        
-        const nextExpense = {
-          ...expenseData,
-          dueDate: nextMonth,
-        };
-        
-        addExpense(nextExpense);
-      }
+      // Criar cópias para os próximos meses usando a função do contexto
+      createFixedExpenseCopies(expenseData, months);
+      
+      toast.success(`Despesa fixa criada para ${months} meses à frente!`);
     } else {
       // Lógica normal
       if (editMode && expense) {
@@ -315,7 +308,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
 
           {isFixed && (
             <div className="space-y-2 ml-6">
-              <Label htmlFor="months">Criar para os próximos meses</Label>
+              <Label htmlFor="months">Criar cópias para os próximos meses</Label>
               <Input
                 id="months"
                 type="number"
@@ -326,7 +319,7 @@ export function ExpenseForm({ type, onSuccess, triggerLabel, expense, editMode =
                 onChange={(e) => setMonths(e.target.value ? parseInt(e.target.value) : 0)}
               />
               <p className="text-xs text-muted-foreground">
-                Cria cópias desta despesa para os próximos N meses
+                Cria cópias desta despesa para os próximos N meses. Cada cópia será independente.
               </p>
             </div>
           )}
